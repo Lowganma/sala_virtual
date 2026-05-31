@@ -2,6 +2,9 @@ import type { RefObject } from "react";
 import type { Room, RoomMessage, RoomState } from "../types/room";
 import type { YouTubePlayerHandle } from "./YouTubePlayer";
 import { CanvasArea } from "./CanvasArea";
+import { RoomSidebar } from "./RoomSidebar";
+import { RoomInfoPanel } from "./RoomInfoPanel";
+import { SharedMessagePanel } from "./SharedMessagePanel";
 import { MusicPanel } from "./MusicPanel";
 import { ChatPanel } from "./ChatPanel";
 
@@ -63,62 +66,37 @@ export function RoomScreen({
 }: RoomScreenProps) {
 
   return (
-    <main className="room-layout">
+  <main className="room-layout">
     <CanvasArea />
 
-    <aside className="room-sidebar">
-      <section className="card">
-      <h1>Sala: {room.code}</h1>
+    <RoomSidebar>
+      <RoomInfoPanel room={room} username={username} />
 
-      <p>
-        Comparte este código con otra persona:
-        <strong> {room.code}</strong>
-      </p>
-
-      <p>
-        Usuario actual:
-        <strong> {username || "Invitado"}</strong>
-      </p>
-
-      <hr />
-
-      <label>Mensaje compartido</label>
-
-      <input
-        value={sharedMessage}
-        onChange={(event) => onSharedMessageChange(event.target.value)}
-        placeholder="Escribe un mensaje para la sala..."
-        disabled={!roomState}
+      <SharedMessagePanel
+        sharedMessage={sharedMessage}
+        saving={saving}
+        canUseRoomState={Boolean(roomState)}
+        onSharedMessageChange={onSharedMessageChange}
+        onSaveMessage={onSaveMessage}
       />
 
-      <button onClick={onSaveMessage} disabled={saving || !roomState}>
-        {saving ? "Guardando..." : "Guardar mensaje"}
-      </button>
-
-      <div className="shared-box">
-        <p className="preview-title">Todos deberían ver:</p>
-        <p>{sharedMessage || "Todavía no hay mensaje compartido."}</p>
-      </div>
-
-      
-
       <MusicPanel
-  youtubePlayerRef={youtubePlayerRef}
-  youtubeUrl={youtubeUrl}
-  isPlaying={isPlaying}
-  playbackSeconds={playbackSeconds}
-  playbackUpdatedAt={playbackUpdatedAt}
-  savingYoutube={savingYoutube}
-  syncingPlayback={syncingPlayback}
-  canUseRoomState={Boolean(roomState)}
-  onYoutubeUrlChange={onYoutubeUrlChange}
-  onSaveYoutubeUrl={onSaveYoutubeUrl}
-  onPlayForEveryone={onPlayForEveryone}
-  onPauseForEveryone={onPauseForEveryone}
-  onSyncToStart={onSyncToStart}
-/>
+        youtubePlayerRef={youtubePlayerRef}
+        youtubeUrl={youtubeUrl}
+        isPlaying={isPlaying}
+        playbackSeconds={playbackSeconds}
+        playbackUpdatedAt={playbackUpdatedAt}
+        savingYoutube={savingYoutube}
+        syncingPlayback={syncingPlayback}
+        canUseRoomState={Boolean(roomState)}
+        onYoutubeUrlChange={onYoutubeUrlChange}
+        onSaveYoutubeUrl={onSaveYoutubeUrl}
+        onPlayForEveryone={onPlayForEveryone}
+        onPauseForEveryone={onPauseForEveryone}
+        onSyncToStart={onSyncToStart}
+      />
 
-            <ChatPanel
+      <ChatPanel
         chatMessages={chatMessages}
         chatInput={chatInput}
         sendingChatMessage={sendingChatMessage}
@@ -126,11 +104,10 @@ export function RoomScreen({
         onSendChatMessage={onSendChatMessage}
       />
 
-           <button className="secondary" onClick={onLeaveRoom}>
+      <button className="secondary" onClick={onLeaveRoom}>
         Salir de la sala
       </button>
-    </section>
-  </aside>
-</main>
+    </RoomSidebar>
+  </main>
 );
 }
