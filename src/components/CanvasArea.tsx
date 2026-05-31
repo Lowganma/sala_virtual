@@ -8,11 +8,16 @@ type CanvasAreaProps = {
     type: "image" | "gif";
     x: number;
     y: number;
+    file?: File;
   }) => void;
   onCanvasMouseDown?: () => void;
 };
 
-export function CanvasArea({ children, onPasteImage, onCanvasMouseDown }: CanvasAreaProps) {
+export function CanvasArea({
+  children,
+  onPasteImage,
+  onCanvasMouseDown,
+}: CanvasAreaProps) {
   return (
     <CanvasViewport
       activeTool="hand"

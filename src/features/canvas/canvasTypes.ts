@@ -15,6 +15,7 @@ export type CanvasDocument = {
 
 export type CanvasImageLayer = {
   id: string;
+  room_id?: string;
   type: "image" | "gif";
   src: string;
   x: number;
@@ -22,4 +23,7 @@ export type CanvasImageLayer = {
   w: number;
   h: number;
   z: number;
+  z_index?: number;
+  created_at?: string;
+  updated_at?: string;
 };

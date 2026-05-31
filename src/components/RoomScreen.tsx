@@ -50,7 +50,23 @@ type RoomScreenProps = {
   onPlayForEveryone: () => void;
   onPauseForEveryone: () => void;
   onSyncToStart: () => void;
-  
+  canvasLayers: CanvasImageLayerType[];
+  onCreateCanvasLayer: (payload: {
+    type: "image" | "gif";
+    src: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    file?: File;
+  }) => void;
+  onMoveCanvasLayer: (
+    id: string,
+    nextPosition: { x: number; y: number }
+  ) => void;
+  onResizeCanvasLayer: (id: string, nextSize: { w: number; h: number }) => void;
+  onDeleteCanvasLayer: (id: string) => void;
+    
   onLeaveRoom: () => void;
 };
 
@@ -84,11 +100,15 @@ export function RoomScreen({
   onPlayForEveryone,
   onPauseForEveryone,
   onSyncToStart,
+  canvasLayers,
+  onCreateCanvasLayer,
+  onMoveCanvasLayer,
+  onResizeCanvasLayer,
+  onDeleteCanvasLayer,
   onLeaveRoom,
 }: RoomScreenProps) {
 
 const [selectedWindowKey, setSelectedWindowKey] = useState<string | null>(null);
-const [canvasLayers, setCanvasLayers] = useState<CanvasImageLayerType[]>([]);
 const [selectedCanvasLayerId, setSelectedCanvasLayerId] = useState<string | null>(
   null
 );
@@ -147,62 +167,36 @@ function handlePasteImage(payload: {
   type: "image" | "gif";
   x: number;
   y: number;
+  file?: File;
 }) {
-  const nextLayer: CanvasImageLayerType = {
-    id: crypto.randomUUID(),
+  void onCreateCanvasLayer({
     type: payload.type,
     src: payload.src,
     x: payload.x - 160,
     y: payload.y - 120,
     w: 320,
     h: 240,
-    z: canvasLayers.length + 30,
-  };
-
-  setCanvasLayers((currentLayers) => [...currentLayers, nextLayer]);
-  setSelectedCanvasLayerId(nextLayer.id);
+    file: payload.file,
+  });
 }
 
 function moveCanvasLayer(
   id: string,
   nextPosition: { x: number; y: number }
 ) {
-  setCanvasLayers((currentLayers) =>
-    currentLayers.map((layer) =>
-      layer.id === id
-        ? {
-            ...layer,
-            x: nextPosition.x,
-            y: nextPosition.y,
-          }
-        : layer
-    )
-  );
+  void onMoveCanvasLayer(id, nextPosition);
 }
 
 function resizeCanvasLayer(id: string, nextSize: { w: number; h: number }) {
-  setCanvasLayers((currentLayers) =>
-    currentLayers.map((layer) =>
-      layer.id === id
-        ? {
-            ...layer,
-            w: nextSize.w,
-            h: nextSize.h,
-          }
-        : layer
-    )
-  );
+  void onResizeCanvasLayer(id, nextSize);
 }
 
-  function deleteSelectedCanvasLayer() {
+function deleteSelectedCanvasLayer() {
   if (!selectedCanvasLayerId) {
     return;
   }
 
-  setCanvasLayers((currentLayers) =>
-    currentLayers.filter((layer) => layer.id !== selectedCanvasLayerId)
-  );
-
+  void onDeleteCanvasLayer(selectedCanvasLayerId);
   setSelectedCanvasLayerId(null);
 }
 

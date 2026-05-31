@@ -9,6 +9,8 @@ import { RoomScreen } from "./components/RoomScreen";
 
 import type { YouTubePlayerHandle } from "./components/YoutubePlayer";
 
+import type { CanvasImageLayer } from "./features/canvas/canvasTypes";
+
 function generateRoomCode() {
   const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -29,6 +31,8 @@ function App() {
   const [currentRoomState, setCurrentRoomState] = useState<RoomState | null>(
     null
   );
+  const [canvasLayers, setCanvasLayers] = useState<CanvasImageLayer[]>([]);
+
   const [chatMessages, setChatMessages] = useState<RoomMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingChatMessage, setSendingChatMessage] = useState(false);
@@ -158,6 +162,71 @@ function App() {
   };
 }, [currentRoom?.id]);
 
+  useEffect(() => {
+  if (!currentRoom) {
+    return;
+  }
+
+  const channel = supabase
+    .channel(`canvas-layers-${currentRoom.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "canvas_layers",
+        filter: `room_id=eq.${currentRoom.id}`,
+      },
+      (payload) => {
+        if (payload.eventType === "DELETE") {
+          const deletedLayer = payload.old as { id: string };
+
+          setCanvasLayers((currentLayers) =>
+            currentLayers.filter((layer) => layer.id !== deletedLayer.id)
+          );
+
+          return;
+        }
+
+        const changedLayer = payload.new as any;
+
+        const normalizedLayer: CanvasImageLayer = {
+          id: changedLayer.id,
+          room_id: changedLayer.room_id,
+          type: changedLayer.type,
+          src: changedLayer.src,
+          x: Number(changedLayer.x),
+          y: Number(changedLayer.y),
+          w: Number(changedLayer.w),
+          h: Number(changedLayer.h),
+          z: Number(changedLayer.z_index),
+          z_index: Number(changedLayer.z_index),
+          created_at: changedLayer.created_at,
+          updated_at: changedLayer.updated_at,
+        };
+
+        setCanvasLayers((currentLayers) => {
+          const exists = currentLayers.some(
+            (layer) => layer.id === normalizedLayer.id
+          );
+
+          if (!exists) {
+            return [...currentLayers, normalizedLayer];
+          }
+
+          return currentLayers.map((layer) =>
+            layer.id === normalizedLayer.id ? normalizedLayer : layer
+          );
+        });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [currentRoom?.id]);
+
   async function loadRoomState(roomId: string) {
     const { data, error } = await supabase
       .from("room_state")
@@ -238,6 +307,37 @@ function App() {
   setRoomWindows(createdWindows);
 }
 
+  async function loadCanvasLayers(roomId: string) {
+  const { data, error } = await supabase
+    .from("canvas_layers")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("z_index", { ascending: true });
+
+  if (error || !data) {
+    console.error(error);
+    setMessage("No se pudieron cargar los elementos del canvas.");
+    return;
+  }
+
+  const normalizedLayers: CanvasImageLayer[] = data.map((layer) => ({
+    id: layer.id,
+    room_id: layer.room_id,
+    type: layer.type,
+    src: layer.src,
+    x: Number(layer.x),
+    y: Number(layer.y),
+    w: Number(layer.w),
+    h: Number(layer.h),
+    z: Number(layer.z_index),
+    z_index: Number(layer.z_index),
+    created_at: layer.created_at,
+    updated_at: layer.updated_at,
+  }));
+
+  setCanvasLayers(normalizedLayers);
+}
+
   async function createRoom() {
     setLoading(true);
     setMessage("");
@@ -285,6 +385,7 @@ function App() {
       setPlaybackUpdatedAt(stateData.playback_updated_at || "");
       setChatMessages([]);
       await loadOrCreateRoomWindows(roomData.id);
+      await loadCanvasLayers(roomData.id);
     } catch (error) {
       console.error(error);
       setMessage("Ocurrió un error al crear la sala.");
@@ -348,6 +449,7 @@ function App() {
       await loadRoomState(roomData.id);
       await loadRoomMessages(roomData.id);
       await loadOrCreateRoomWindows(roomData.id);
+      await loadCanvasLayers(roomData.id);
     } catch (error) {
       console.error(error);
       setMessage("Ocurrió un error al intentar entrar a la sala.");
@@ -617,6 +719,178 @@ function syncToStart() {
   );
 }
 
+  async function uploadCanvasFile(file: File) {
+  if (!currentRoom) {
+    return null;
+  }
+
+  const extension = file.name.split(".").pop() || "png";
+  const safeExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const filePath = `${currentRoom.id}/${crypto.randomUUID()}.${safeExtension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("canvas-assets")
+    .upload(filePath, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    console.error(uploadError);
+    setMessage("No se pudo subir la imagen al Storage.");
+    return null;
+  }
+
+  const { data } = supabase.storage
+    .from("canvas-assets")
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+
+  async function createCanvasLayer(payload: {
+  type: "image" | "gif";
+  src: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  file?: File;
+}) {
+  if (!currentRoom) {
+    return;
+  }
+  let finalSrc = payload.src;
+
+if (payload.file) {
+  const uploadedUrl = await uploadCanvasFile(payload.file);
+
+  if (!uploadedUrl) {
+    return;
+  }
+
+  finalSrc = uploadedUrl;
+}
+
+  const nextZ =
+    canvasLayers.length === 0
+      ? 30
+      : Math.max(...canvasLayers.map((layer) => layer.z || 0)) + 1;
+
+  const { data, error } = await supabase
+    .from("canvas_layers")
+    .insert({
+      room_id: currentRoom.id,
+      type: payload.type,
+      src: finalSrc,
+      x: payload.x,
+      y: payload.y,
+      w: payload.w,
+      h: payload.h,
+      z_index: nextZ,
+    })
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error(error);
+    setMessage("No se pudo agregar el elemento al canvas.");
+    return;
+  }
+
+  const normalizedLayer: CanvasImageLayer = {
+    id: data.id,
+    room_id: data.room_id,
+    type: data.type,
+    src: data.src,
+    x: Number(data.x),
+    y: Number(data.y),
+    w: Number(data.w),
+    h: Number(data.h),
+    z: Number(data.z_index),
+    z_index: Number(data.z_index),
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  };
+
+  setCanvasLayers((currentLayers) => [...currentLayers, normalizedLayer]);
+}
+
+async function updateCanvasLayerPosition(
+  id: string,
+  nextPosition: { x: number; y: number }
+) {
+  setCanvasLayers((currentLayers) =>
+    currentLayers.map((layer) =>
+      layer.id === id
+        ? {
+            ...layer,
+            x: nextPosition.x,
+            y: nextPosition.y,
+          }
+        : layer
+    )
+  );
+
+  const { error } = await supabase
+    .from("canvas_layers")
+    .update({
+      x: nextPosition.x,
+      y: nextPosition.y,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error(error);
+    setMessage("No se pudo mover el elemento.");
+  }
+}
+
+async function updateCanvasLayerSize(
+  id: string,
+  nextSize: { w: number; h: number }
+) {
+  setCanvasLayers((currentLayers) =>
+    currentLayers.map((layer) =>
+      layer.id === id
+        ? {
+            ...layer,
+            w: nextSize.w,
+            h: nextSize.h,
+          }
+        : layer
+    )
+  );
+
+  const { error } = await supabase
+    .from("canvas_layers")
+    .update({
+      w: nextSize.w,
+      h: nextSize.h,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error(error);
+    setMessage("No se pudo redimensionar el elemento.");
+  }
+}
+
+async function deleteCanvasLayer(id: string) {
+  setCanvasLayers((currentLayers) =>
+    currentLayers.filter((layer) => layer.id !== id)
+  );
+
+  const { error } = await supabase.from("canvas_layers").delete().eq("id", id);
+
+  if (error) {
+    console.error(error);
+    setMessage("No se pudo eliminar el elemento.");
+  }
+}
+
   function leaveRoom() {
     setCurrentRoom(null);
     setCurrentRoomState(null);
@@ -629,6 +903,7 @@ function syncToStart() {
     setChatInput("");
     setRoomCode("");
     setMessage("");
+    setCanvasLayers([]);
   }
 
   return (
@@ -660,6 +935,11 @@ function syncToStart() {
           onChatInputChange={setChatInput}
           onSendChatMessage={sendChatMessage}
           onSyncToStart={syncToStart}
+          canvasLayers={canvasLayers}
+          onCreateCanvasLayer={createCanvasLayer}
+          onMoveCanvasLayer={updateCanvasLayerPosition}
+          onResizeCanvasLayer={updateCanvasLayerSize}
+          onDeleteCanvasLayer={deleteCanvasLayer}
           roomWindows={roomWindows}
           onWindowPositionChange={updateRoomWindowPosition}
           onWindowMinimizedChange={updateRoomWindowMinimized}

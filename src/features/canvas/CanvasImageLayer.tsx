@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CanvasImageLayer as CanvasImageLayerType } from "./canvasTypes";
 
 type CanvasImageLayerProps = {
@@ -15,6 +16,8 @@ export function CanvasImageLayer({
   onMove,
   onResize,
 }: CanvasImageLayerProps) {
+  const [hasImageError, setHasImageError] = useState(false);
+
   function startMove(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
     event.stopPropagation();
@@ -51,6 +54,8 @@ export function CanvasImageLayer({
   function startResize(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
+
+    onSelect(layer.id);
 
     const startMouseX = event.clientX;
     const startMouseY = event.clientY;
@@ -90,8 +95,21 @@ export function CanvasImageLayer({
         zIndex: layer.z,
       }}
       onMouseDown={startMove}
+      title={layer.src}
     >
-      <img src={layer.src} draggable={false} alt="" />
+      {hasImageError ? (
+        <div className="canvas-layer-error">
+          <strong>Imagen no disponible</strong>
+          <span>Selecciona y presiona Supr para eliminarla.</span>
+        </div>
+      ) : (
+        <img
+          src={layer.src}
+          draggable={false}
+          alt=""
+          onError={() => setHasImageError(true)}
+        />
+      )}
 
       {isSelected && (
         <button

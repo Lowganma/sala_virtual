@@ -16,6 +16,7 @@ type CanvasViewportProps = {
     type: "image" | "gif";
     x: number;
     y: number;
+    file?: File;
   }) => void;
   onCanvasMouseDown?: () => void;
 };
@@ -192,10 +193,26 @@ function handlePaste(event: ClipboardEvent) {
 
   event.preventDefault();
 
-  const src = URL.createObjectURL(file);
-  const type = file.type === "image/gif" ? "gif" : "image";
+const src = URL.createObjectURL(file);
+const type = file.type === "image/gif" ? "gif" : "image";
 
-  pasteAtViewportCenter(src, type);
+if (!viewportRef.current || !onPasteImage) {
+  return;
+}
+
+const centerX = viewportSize.width / 2;
+const centerY = viewportSize.height / 2;
+
+const worldX = (centerX - view.panX) / view.zoom;
+const worldY = (centerY - view.panY) / view.zoom;
+
+onPasteImage({
+  src,
+  type,
+  x: worldX,
+  y: worldY,
+  file,
+});
 }
 
   window.addEventListener("paste", handlePaste);
