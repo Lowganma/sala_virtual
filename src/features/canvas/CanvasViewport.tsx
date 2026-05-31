@@ -319,11 +319,7 @@ export function CanvasViewport({
         <div className="canvas-world-grid" />
 
         <div className="canvas-empty-state">
-          <h2>Canvas de la sala</h2>
-          <p>
-            Mundo editable de {WORLD_WIDTH} x {WORLD_HEIGHT}. Aquí agregaremos
-            imágenes, GIFs, dibujo y módulos.
-          </p>
+          
         </div>
         {children}
 
