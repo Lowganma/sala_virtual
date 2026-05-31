@@ -35,7 +35,6 @@ export function MusicPanel({
 }: MusicPanelProps) {
   return (
     <>
-      <hr />
 
       <label>Música de YouTube</label>
 

@@ -1,12 +1,11 @@
 import type { RefObject } from "react";
-import type { Room, RoomMessage, RoomState } from "../types/room";
+import type { Room, RoomMessage, RoomState, RoomWindow } from "../types/room";
 import type { YouTubePlayerHandle } from "./YouTubePlayer";
 import { CanvasArea } from "./CanvasArea";
-import { RoomSidebar } from "./RoomSidebar";
 import { RoomInfoPanel } from "./RoomInfoPanel";
-import { SharedMessagePanel } from "./SharedMessagePanel";
 import { MusicPanel } from "./MusicPanel";
 import { ChatPanel } from "./ChatPanel";
+import { FloatingWindow } from "./FloatingWindow";
 
 type RoomScreenProps = {
   room: Room;
@@ -24,6 +23,11 @@ type RoomScreenProps = {
   chatMessages: RoomMessage[];
   chatInput: string;
   sendingChatMessage: boolean;
+  roomWindows: RoomWindow[];
+  onWindowPositionChange: (
+  windowKey: string,
+  nextPosition: { x: number; y: number }
+) => void;
   onChatInputChange: (value: string) => void;
   onSendChatMessage: () => void;
   onSharedMessageChange: (value: string) => void;
@@ -33,6 +37,7 @@ type RoomScreenProps = {
   onPlayForEveryone: () => void;
   onPauseForEveryone: () => void;
   onSyncToStart: () => void;
+  
   onLeaveRoom: () => void;
 };
 
@@ -53,6 +58,8 @@ export function RoomScreen({
   chatMessages,
   chatInput,
   sendingChatMessage,
+  roomWindows,
+  onWindowPositionChange,
   onChatInputChange,
   onSendChatMessage,
   onSharedMessageChange,
@@ -65,21 +72,51 @@ export function RoomScreen({
   onLeaveRoom,
 }: RoomScreenProps) {
 
+  function getWindowPosition(
+  windowKey: string,
+  fallback: { x: number; y: number }
+) {
+  const savedWindow = roomWindows.find(
+    (roomWindow) => roomWindow.window_key === windowKey
+  );
+
+  if (!savedWindow) {
+    return fallback;
+  }
+
+  return {
+    x: Number(savedWindow.x),
+    y: Number(savedWindow.y),
+  };
+}
+
   return (
   <main className="room-layout">
     <CanvasArea />
 
-    <RoomSidebar>
+    <FloatingWindow
+  title="Sala"
+  className="room-info-window"
+  position={getWindowPosition("room-info", { x: 24, y: 24 })}
+  onPositionChange={(nextPosition) =>
+    onWindowPositionChange("room-info", nextPosition)
+  }
+>
       <RoomInfoPanel room={room} username={username} />
 
-      <SharedMessagePanel
-        sharedMessage={sharedMessage}
-        saving={saving}
-        canUseRoomState={Boolean(roomState)}
-        onSharedMessageChange={onSharedMessageChange}
-        onSaveMessage={onSaveMessage}
-      />
+      <button className="secondary" onClick={onLeaveRoom}>
+        Salir de la sala
+      </button>
+    </FloatingWindow>
 
+   <FloatingWindow
+  title="Música"
+  className="music-window"
+  position={getWindowPosition("music", { x: 24, y: 190 })}
+  onPositionChange={(nextPosition) =>
+    onWindowPositionChange("music", nextPosition)
+  }
+>
       <MusicPanel
         youtubePlayerRef={youtubePlayerRef}
         youtubeUrl={youtubeUrl}
@@ -95,7 +132,16 @@ export function RoomScreen({
         onPauseForEveryone={onPauseForEveryone}
         onSyncToStart={onSyncToStart}
       />
+    </FloatingWindow>
 
+   <FloatingWindow
+  title="Chat"
+  className="chat-window"
+  position={getWindowPosition("chat", { x: 390, y: 24 })}
+  onPositionChange={(nextPosition) =>
+    onWindowPositionChange("chat", nextPosition)
+  }
+>
       <ChatPanel
         chatMessages={chatMessages}
         chatInput={chatInput}
@@ -103,11 +149,7 @@ export function RoomScreen({
         onChatInputChange={onChatInputChange}
         onSendChatMessage={onSendChatMessage}
       />
-
-      <button className="secondary" onClick={onLeaveRoom}>
-        Salir de la sala
-      </button>
-    </RoomSidebar>
+    </FloatingWindow>
   </main>
 );
 }

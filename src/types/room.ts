@@ -22,3 +22,14 @@ export type RoomMessage = {
   content: string;
   created_at: string;
 };
+
+export type RoomWindow = {
+  id: string;
+  room_id: string;
+  window_key: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  updated_at: string;
+};

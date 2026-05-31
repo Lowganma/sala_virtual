@@ -2,7 +2,7 @@ import { useEffect,useRef, useState } from "react";
 import "./App.css";
 
 import { supabase } from "./lib/supabaseClient";
-import type { Room,RoomMessage, RoomState } from "./types/room";
+import type { Room,RoomMessage, RoomState, RoomWindow } from "./types/room";
 
 import { HomeScreen } from "./components/HomeScreen";
 import { RoomScreen } from "./components/RoomScreen";
@@ -32,6 +32,7 @@ function App() {
   const [chatMessages, setChatMessages] = useState<RoomMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingChatMessage, setSendingChatMessage] = useState(false);
+  const [roomWindows, setRoomWindows] = useState<RoomWindow[]>([]);
 
   const youtubePlayerRef = useRef<YouTubePlayerHandle | null>(null);
   const [sharedMessage, setSharedMessage] = useState("");
@@ -117,6 +118,46 @@ function App() {
   };
 }, [currentRoom?.id]);
 
+  useEffect(() => {
+  if (!currentRoom) {
+    return;
+  }
+
+  const channel = supabase
+    .channel(`room-windows-${currentRoom.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "room_windows",
+        filter: `room_id=eq.${currentRoom.id}`,
+      },
+      (payload) => {
+        const changedWindow = payload.new as RoomWindow;
+
+        setRoomWindows((currentWindows) => {
+          const exists = currentWindows.some(
+            (roomWindow) => roomWindow.id === changedWindow.id
+          );
+
+          if (!exists) {
+            return [...currentWindows, changedWindow];
+          }
+
+          return currentWindows.map((roomWindow) =>
+            roomWindow.id === changedWindow.id ? changedWindow : roomWindow
+          );
+        });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [currentRoom?.id]);
+
   async function loadRoomState(roomId: string) {
     const { data, error } = await supabase
       .from("room_state")
@@ -155,6 +196,47 @@ function App() {
 
   setChatMessages(data);
 }
+
+  async function loadOrCreateRoomWindows(roomId: string) {
+  const { data: existingWindows, error: selectError } = await supabase
+    .from("room_windows")
+    .select("*")
+    .eq("room_id", roomId);
+
+  if (selectError) {
+    console.error(selectError);
+    setMessage("No se pudieron cargar las ventanas de la sala.");
+    return;
+  }
+
+  if (existingWindows && existingWindows.length > 0) {
+    setRoomWindows(existingWindows);
+    return;
+  }
+
+  const windowsToInsert = DEFAULT_WINDOWS.map((windowConfig) => ({
+    room_id: roomId,
+    window_key: windowConfig.window_key,
+    x: windowConfig.x,
+    y: windowConfig.y,
+    width: windowConfig.width,
+    height: windowConfig.height,
+  }));
+
+  const { data: createdWindows, error: insertError } = await supabase
+    .from("room_windows")
+    .insert(windowsToInsert)
+    .select();
+
+  if (insertError || !createdWindows) {
+    console.error(insertError);
+    setMessage("No se pudieron crear las ventanas iniciales.");
+    return;
+  }
+
+  setRoomWindows(createdWindows);
+}
+
   async function createRoom() {
     setLoading(true);
     setMessage("");
@@ -201,6 +283,7 @@ function App() {
       setPlaybackSeconds(Number(stateData.playback_seconds || 0));
       setPlaybackUpdatedAt(stateData.playback_updated_at || "");
       setChatMessages([]);
+      await loadOrCreateRoomWindows(roomData.id);
     } catch (error) {
       console.error(error);
       setMessage("Ocurrió un error al crear la sala.");
@@ -208,6 +291,12 @@ function App() {
       setLoading(false);
     }
   }
+
+    const DEFAULT_WINDOWS = [
+      { window_key: "room-info", x: 24, y: 24, width: 280, height: 220 },
+      { window_key: "music", x: 24, y: 190, width: 340, height: 520 },
+      { window_key: "chat", x: 390, y: 24, width: 340, height: 360 },
+    ];
 
   async function joinRoom() {
     setLoading(true);
@@ -236,6 +325,7 @@ function App() {
       setCurrentRoom(roomData);
       await loadRoomState(roomData.id);
       await loadRoomMessages(roomData.id);
+      await loadOrCreateRoomWindows(roomData.id);
     } catch (error) {
       console.error(error);
       setMessage("Ocurrió un error al intentar entrar a la sala.");
@@ -407,6 +497,39 @@ function syncToStart() {
   }
 }
 
+  async function updateRoomWindowPosition(
+  windowKey: string,
+  nextPosition: { x: number; y: number }
+) {
+  if (!currentRoom) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("room_windows")
+    .update({
+      x: nextPosition.x,
+      y: nextPosition.y,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("room_id", currentRoom.id)
+    .eq("window_key", windowKey)
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error(error);
+    setMessage("No se pudo guardar la posición de la ventana.");
+    return;
+  }
+
+  setRoomWindows((currentWindows) =>
+    currentWindows.map((roomWindow) =>
+      roomWindow.id === data.id ? data : roomWindow
+    )
+  );
+}
+
   function leaveRoom() {
     setCurrentRoom(null);
     setCurrentRoomState(null);
@@ -449,6 +572,8 @@ function syncToStart() {
           onChatInputChange={setChatInput}
           onSendChatMessage={sendChatMessage}
           onSyncToStart={syncToStart}
+          roomWindows={roomWindows}
+          onWindowPositionChange={updateRoomWindowPosition}
           onLeaveRoom={leaveRoom}
         />
       ) : (

@@ -17,7 +17,6 @@ export function ChatPanel({
 }: ChatPanelProps) {
   return (
     <>
-      <hr />
 
       <div className="chat-panel">
         <h2>Chat de la sala</h2>
