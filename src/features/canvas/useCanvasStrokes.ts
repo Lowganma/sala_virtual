@@ -187,7 +187,10 @@ export function useCanvasStrokes(roomId: string) {
           tool: settings.tool,
           color: settings.color,
           size: settings.size,
-          opacity: settings.tool === "pencil" ? 1 : settings.opacity,
+          opacity: settings.tool === "eraser" ? 1 : settings.opacity,
+          brush_intensity: settings.tool === "brush" ? settings.brushIntensity : 1,
+          brush_softness: settings.tool === "brush" ? settings.brushSoftness : 0,
+          brush_smoothing: settings.tool === "brush" ? settings.brushSmoothing : 0,
           points: withBrushMetadata(points, settings),
         })
         .select()
