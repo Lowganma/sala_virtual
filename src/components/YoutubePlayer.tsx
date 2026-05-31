@@ -87,6 +87,7 @@ export const YouTubePlayer = forwardRef<
   const lastAppliedSyncRef = useRef<string>("");
 
   const videoId = getYoutubeVideoId(youtubeUrl);
+  const syncCompensationSeconds = 0.35; // Compensación para la latencia de red y procesamiento
 
   useImperativeHandle(ref, () => ({
     getCurrentTime() {
@@ -140,31 +141,41 @@ export const YouTubePlayer = forwardRef<
     };
   }, [videoId, onReady]);
 
-  useEffect(() => {
-    const player = playerRef.current;
+useEffect(() => {
+  const player = playerRef.current;
 
-    if (!player || !videoId || !playbackUpdatedAt) {
-      return;
+  if (!player || !videoId || !playbackUpdatedAt) {
+    return;
+  }
+
+  if (lastAppliedSyncRef.current === playbackUpdatedAt) {
+    return;
+  }
+
+  lastAppliedSyncRef.current = playbackUpdatedAt;
+
+  try {
+    const baseSeconds = Number(playbackSeconds || 0);
+    const updatedAtTime = new Date(playbackUpdatedAt).getTime();
+    const nowTime = Date.now();
+
+    const elapsedSeconds = Math.max(0, (nowTime - updatedAtTime) / 1000);
+
+    const correctedSeconds = isPlaying
+  ? baseSeconds + elapsedSeconds + syncCompensationSeconds
+  : baseSeconds;
+
+    player.seekTo(correctedSeconds, true);
+
+    if (isPlaying) {
+      player.playVideo();
+    } else {
+      player.pauseVideo();
     }
-
-    if (lastAppliedSyncRef.current === playbackUpdatedAt) {
-      return;
-    }
-
-    lastAppliedSyncRef.current = playbackUpdatedAt;
-
-    try {
-      player.seekTo(Number(playbackSeconds || 0), true);
-
-      if (isPlaying) {
-        player.playVideo();
-      } else {
-        player.pauseVideo();
-      }
-    } catch (error) {
-      console.error("No se pudo sincronizar el reproductor:", error);
-    }
-  }, [videoId, isPlaying, playbackSeconds, playbackUpdatedAt]);
+  } catch (error) {
+    console.error("No se pudo sincronizar el reproductor:", error);
+  }
+}, [videoId, isPlaying, playbackSeconds, playbackUpdatedAt]);
 
   if (!videoId) {
     return <p>Todavía no hay video válido.</p>;

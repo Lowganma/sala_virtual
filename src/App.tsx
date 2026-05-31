@@ -2,7 +2,7 @@ import { useEffect,useRef, useState } from "react";
 import "./App.css";
 
 import { supabase } from "./lib/supabaseClient";
-import type { Room, RoomState } from "./types/room";
+import type { Room,RoomMessage, RoomState } from "./types/room";
 
 import { HomeScreen } from "./components/HomeScreen";
 import { RoomScreen } from "./components/RoomScreen";
@@ -29,6 +29,9 @@ function App() {
   const [currentRoomState, setCurrentRoomState] = useState<RoomState | null>(
     null
   );
+  const [chatMessages, setChatMessages] = useState<RoomMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [sendingChatMessage, setSendingChatMessage] = useState(false);
 
   const youtubePlayerRef = useRef<YouTubePlayerHandle | null>(null);
   const [sharedMessage, setSharedMessage] = useState("");
@@ -76,6 +79,44 @@ function App() {
   };
 }, [currentRoomState?.id]);
 
+  useEffect(() => {
+  if (!currentRoom) {
+    return;
+  }
+
+  const channel = supabase
+    .channel(`room-messages-${currentRoom.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "room_messages",
+        filter: `room_id=eq.${currentRoom.id}`,
+      },
+      (payload) => {
+        const newMessage = payload.new as RoomMessage;
+
+        setChatMessages((currentMessages) => {
+          const alreadyExists = currentMessages.some(
+            (message) => message.id === newMessage.id
+          );
+
+          if (alreadyExists) {
+            return currentMessages;
+          }
+
+          return [...currentMessages, newMessage];
+        });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [currentRoom?.id]);
+
   async function loadRoomState(roomId: string) {
     const { data, error } = await supabase
       .from("room_state")
@@ -99,6 +140,21 @@ function App() {
     return data;
   }
 
+  async function loadRoomMessages(roomId: string) {
+  const { data, error } = await supabase
+    .from("room_messages")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) {
+    console.error(error);
+    setMessage("No se pudieron cargar los mensajes del chat.");
+    return;
+  }
+
+  setChatMessages(data);
+}
   async function createRoom() {
     setLoading(true);
     setMessage("");
@@ -124,6 +180,9 @@ function App() {
           room_id: roomData.id,
           message: "",
           youtube_url: "",
+          is_playing: false,
+          playback_seconds: 0,
+          playback_updated_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -138,6 +197,10 @@ function App() {
       setCurrentRoomState(stateData);
       setSharedMessage(stateData.message || "");
       setYoutubeUrl(stateData.youtube_url || "");
+      setIsPlaying(Boolean(stateData.is_playing));
+      setPlaybackSeconds(Number(stateData.playback_seconds || 0));
+      setPlaybackUpdatedAt(stateData.playback_updated_at || "");
+      setChatMessages([]);
     } catch (error) {
       console.error(error);
       setMessage("Ocurrió un error al crear la sala.");
@@ -172,6 +235,7 @@ function App() {
 
       setCurrentRoom(roomData);
       await loadRoomState(roomData.id);
+      await loadRoomMessages(roomData.id);
     } catch (error) {
       console.error(error);
       setMessage("Ocurrió un error al intentar entrar a la sala.");
@@ -307,6 +371,42 @@ function syncToStart() {
   updatePlayback(false, 0);
 }
 
+  async function sendChatMessage() {
+  if (!currentRoom) {
+    setMessage("No hay sala activa.");
+    return;
+  }
+
+  const cleanContent = chatInput.trim();
+
+  if (!cleanContent) {
+    return;
+  }
+
+  setSendingChatMessage(true);
+
+  try {
+    const { error } = await supabase.from("room_messages").insert({
+      room_id: currentRoom.id,
+      username: username.trim() || "Invitado",
+      content: cleanContent,
+    });
+
+    if (error) {
+      console.error(error);
+      setMessage("No se pudo enviar el mensaje.");
+      return;
+    }
+
+    setChatInput("");
+  } catch (error) {
+    console.error(error);
+    setMessage("Ocurrió un error al enviar el mensaje.");
+  } finally {
+    setSendingChatMessage(false);
+  }
+}
+
   function leaveRoom() {
     setCurrentRoom(null);
     setCurrentRoomState(null);
@@ -315,6 +415,8 @@ function syncToStart() {
     setIsPlaying(false);
     setPlaybackSeconds(0);
     setPlaybackUpdatedAt("");
+    setChatMessages([]);
+    setChatInput("");
     setRoomCode("");
     setMessage("");
   }
@@ -341,6 +443,11 @@ function syncToStart() {
           onSaveYoutubeUrl={saveYoutubeUrl}
           onPlayForEveryone={playForEveryone}
           onPauseForEveryone={pauseForEveryone}
+          chatMessages={chatMessages}
+          chatInput={chatInput}
+          sendingChatMessage={sendingChatMessage}
+          onChatInputChange={setChatInput}
+          onSendChatMessage={sendChatMessage}
           onSyncToStart={syncToStart}
           onLeaveRoom={leaveRoom}
         />

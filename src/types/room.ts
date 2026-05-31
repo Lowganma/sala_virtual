@@ -14,3 +14,11 @@ export type RoomState = {
   playback_updated_at: string;
   updated_at: string;
 };
+
+export type RoomMessage = {
+  id: string;
+  room_id: string;
+  username: string;
+  content: string;
+  created_at: string;
+};
