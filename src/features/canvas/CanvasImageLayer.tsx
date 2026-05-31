@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { LayerControls } from "../layers/LayerControls";
 import type { CanvasImageLayer as CanvasImageLayerType } from "./canvasTypes";
 
 type CanvasImageLayerProps = {
@@ -7,6 +8,11 @@ type CanvasImageLayerProps = {
   onSelect: (id: string) => void;
   onMove: (id: string, nextPosition: { x: number; y: number }) => void;
   onResize: (id: string, nextSize: { w: number; h: number }) => void;
+  zIndex: number;
+  layerIndex: number;
+  layerCount: number;
+  onMoveBackward: (id: string) => void;
+  onMoveForward: (id: string) => void;
 };
 
 export function CanvasImageLayer({
@@ -15,6 +21,11 @@ export function CanvasImageLayer({
   onSelect,
   onMove,
   onResize,
+  zIndex,
+  layerIndex,
+  layerCount,
+  onMoveBackward,
+  onMoveForward,
 }: CanvasImageLayerProps) {
   const [hasImageError, setHasImageError] = useState(false);
 
@@ -92,7 +103,7 @@ export function CanvasImageLayer({
         top: layer.y,
         width: layer.w,
         height: layer.h,
-        zIndex: layer.z,
+        zIndex,
       }}
       onMouseDown={startMove}
       title={layer.src}
@@ -112,11 +123,23 @@ export function CanvasImageLayer({
       )}
 
       {isSelected && (
-        <button
-          className="resize-handle"
-          onMouseDown={startResize}
-          aria-label="Redimensionar"
-        />
+        <>
+          <LayerControls
+            label="Capa"
+            layerIndex={layerIndex}
+            layerCount={layerCount}
+            canMoveBackward={layerIndex > 1}
+            canMoveForward={layerIndex < layerCount}
+            onMoveBackward={() => onMoveBackward(layer.id)}
+            onMoveForward={() => onMoveForward(layer.id)}
+          />
+
+          <button
+            className="resize-handle"
+            onMouseDown={startResize}
+            aria-label="Redimensionar"
+          />
+        </>
       )}
     </div>
   );

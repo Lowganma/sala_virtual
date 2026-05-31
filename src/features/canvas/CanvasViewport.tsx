@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import {
+  getPastedCanvasImage,
+  isTypingInEditableElement,
+} from "./canvasClipboard";
 import { useCanvasViewport } from "./useCanvasViewport";
 import type { Tool } from "./canvasTypes";
 
@@ -21,9 +25,13 @@ type CanvasViewportProps = {
   onCanvasMouseDown?: () => void;
 };
 
-export function CanvasViewport({ activeTool, children, onPasteImage, onCanvasMouseDown }: CanvasViewportProps) {
+export function CanvasViewport({
+  activeTool,
+  children,
+  onPasteImage,
+  onCanvasMouseDown,
+}: CanvasViewportProps) {
   const viewportRef = useRef<HTMLElement | null>(null);
-
   const panDragRef = useRef<{
     pointerStartX: number;
     pointerStartY: number;
@@ -35,22 +43,15 @@ export function CanvasViewport({ activeTool, children, onPasteImage, onCanvasMou
     width: 1,
     height: 1,
   });
-
   const [isPanning, setIsPanning] = useState(false);
 
-  const {
-    view,
-    zoomAtPoint,
-    panByPointerDrag,
-    zoomIn,
-    zoomOut,
-    resetView,
-  } = useCanvasViewport({
-    minZoom: MIN_ZOOM,
-    maxZoom: MAX_ZOOM,
-    worldWidth: WORLD_WIDTH,
-    worldHeight: WORLD_HEIGHT,
-  });
+  const { view, zoomAtPoint, panByPointerDrag, zoomIn, zoomOut, resetView } =
+    useCanvasViewport({
+      minZoom: MIN_ZOOM,
+      maxZoom: MAX_ZOOM,
+      worldWidth: WORLD_WIDTH,
+      worldHeight: WORLD_HEIGHT,
+    });
 
   useEffect(() => {
     if (!viewportRef.current) {
@@ -85,7 +86,7 @@ export function CanvasViewport({ activeTool, children, onPasteImage, onCanvasMou
 
       event.preventDefault();
 
-      const rect = viewportElement.getBoundingClientRect();
+      const rect = viewportElement!.getBoundingClientRect();
 
       zoomAtPoint({
         deltaY: event.deltaY,
@@ -105,129 +106,60 @@ export function CanvasViewport({ activeTool, children, onPasteImage, onCanvasMou
     };
   }, [viewportSize.width, viewportSize.height, zoomAtPoint]);
 
-useEffect(() => {
-  function isTypingInInput() {
-    const activeElement = document.activeElement;
-
-    return (
-      activeElement instanceof HTMLInputElement ||
-      activeElement instanceof HTMLTextAreaElement ||
-      activeElement instanceof HTMLSelectElement ||
-      activeElement?.getAttribute("contenteditable") === "true"
-    );
-  }
-
-  function pasteAtViewportCenter(src: string, type: "image" | "gif") {
-    if (!viewportRef.current || !onPasteImage) {
-      return;
-    }
-
-    const centerX = viewportSize.width / 2;
-    const centerY = viewportSize.height / 2;
-
-    const worldX = (centerX - view.panX) / view.zoom;
-    const worldY = (centerY - view.panY) / view.zoom;
-
-    onPasteImage({
+  useEffect(() => {
+    function pasteAtViewportCenter({
       src,
       type,
-      x: worldX,
-      y: worldY,
-    });
-  }
+      file,
+    }: {
+      src: string;
+      type: "image" | "gif";
+      file?: File;
+    }) {
+      if (!viewportRef.current || !onPasteImage) {
+        return;
+      }
 
-function handlePaste(event: ClipboardEvent) {
-  if (isTypingInInput()) {
-    return;
-  }
+      const centerX = viewportSize.width / 2;
+      const centerY = viewportSize.height / 2;
 
-  const text = event.clipboardData?.getData("text/plain")?.trim();
-  const html = event.clipboardData?.getData("text/html");
-
-  const directImageUrlPattern = /\.(png|jpg|jpeg|webp|gif)(\?.*)?$/i;
-
-  if (text && directImageUrlPattern.test(text)) {
-    event.preventDefault();
-
-    pasteAtViewportCenter(
-      text,
-      /\.gif(\?.*)?$/i.test(text) ? "gif" : "image"
-    );
-
-    return;
-  }
-
-  if (html) {
-    const parser = new DOMParser();
-    const documentFromClipboard = parser.parseFromString(html, "text/html");
-    const imageElement = documentFromClipboard.querySelector("img");
-    const imageSrc = imageElement?.getAttribute("src") || "";
-
-    if (imageSrc && directImageUrlPattern.test(imageSrc)) {
-      event.preventDefault();
-
-      pasteAtViewportCenter(
-        imageSrc,
-        /\.gif(\?.*)?$/i.test(imageSrc) ? "gif" : "image"
-      );
-
-      return;
+      onPasteImage({
+        src,
+        type,
+        x: (centerX - view.panX) / view.zoom,
+        y: (centerY - view.panY) / view.zoom,
+        file,
+      });
     }
-  }
 
-  const clipboardItems = Array.from(event.clipboardData?.items || []);
+    function handlePaste(event: ClipboardEvent) {
+      if (isTypingInEditableElement()) {
+        return;
+      }
 
-  const imageItem = clipboardItems.find((item) =>
-    item.type.startsWith("image/")
-  );
+      const pastedImage = getPastedCanvasImage(event);
 
-  if (!imageItem) {
-    return;
-  }
+      if (!pastedImage) {
+        return;
+      }
 
-  const file = imageItem.getAsFile();
+      event.preventDefault();
+      pasteAtViewportCenter(pastedImage);
+    }
 
-  if (!file) {
-    return;
-  }
+    window.addEventListener("paste", handlePaste);
 
-  event.preventDefault();
-
-const src = URL.createObjectURL(file);
-const type = file.type === "image/gif" ? "gif" : "image";
-
-if (!viewportRef.current || !onPasteImage) {
-  return;
-}
-
-const centerX = viewportSize.width / 2;
-const centerY = viewportSize.height / 2;
-
-const worldX = (centerX - view.panX) / view.zoom;
-const worldY = (centerY - view.panY) / view.zoom;
-
-onPasteImage({
-  src,
-  type,
-  x: worldX,
-  y: worldY,
-  file,
-});
-}
-
-  window.addEventListener("paste", handlePaste);
-
-  return () => {
-    window.removeEventListener("paste", handlePaste);
-  };
-}, [
-  onPasteImage,
-  view.panX,
-  view.panY,
-  view.zoom,
-  viewportSize.width,
-  viewportSize.height,
-]);
+    return () => {
+      window.removeEventListener("paste", handlePaste);
+    };
+  }, [
+    onPasteImage,
+    view.panX,
+    view.panY,
+    view.zoom,
+    viewportSize.width,
+    viewportSize.height,
+  ]);
 
   return (
     <section
@@ -268,7 +200,6 @@ onPasteImage({
         }
 
         event.preventDefault();
-
         setIsPanning(true);
 
         panDragRef.current = {
