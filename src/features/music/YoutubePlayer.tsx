@@ -5,9 +5,26 @@ import {
   useRef,
 } from "react";
 
+type YouTubePlayerApi = {
+  destroy: () => void;
+  getCurrentTime: () => number;
+  pauseVideo: () => void;
+  playVideo: () => void;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+};
+
+type YouTubeConstructor = new (
+  element: HTMLElement,
+  options: {
+    videoId: string;
+    playerVars: { playsinline: number; controls: number };
+    events: { onReady: () => void };
+  }
+) => YouTubePlayerApi;
+
 declare global {
   interface Window {
-    YT?: any;
+    YT?: { Player?: YouTubeConstructor };
     onYouTubeIframeAPIReady?: () => void;
   }
 }
@@ -83,7 +100,7 @@ export const YouTubePlayer = forwardRef<
   ref
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<YouTubePlayerApi | null>(null);
   const lastAppliedSyncRef = useRef<string>("");
 
   const videoId = getYoutubeVideoId(youtubeUrl);
@@ -111,7 +128,9 @@ export const YouTubePlayer = forwardRef<
     async function setupPlayer() {
       await loadYouTubeApi();
 
-      if (cancelled || !containerRef.current || !window.YT) {
+      const Player = window.YT?.Player;
+
+      if (cancelled || !containerRef.current || !Player) {
         return;
       }
 
@@ -120,7 +139,7 @@ export const YouTubePlayer = forwardRef<
         playerRef.current = null;
       }
 
-      playerRef.current = new window.YT.Player(containerRef.current, {
+      playerRef.current = new Player(containerRef.current, {
         videoId,
         playerVars: {
           playsinline: 1,
@@ -141,41 +160,40 @@ export const YouTubePlayer = forwardRef<
     };
   }, [videoId, onReady]);
 
-useEffect(() => {
-  const player = playerRef.current;
+  useEffect(() => {
+    const player = playerRef.current;
 
-  if (!player || !videoId || !playbackUpdatedAt) {
-    return;
-  }
-
-  if (lastAppliedSyncRef.current === playbackUpdatedAt) {
-    return;
-  }
-
-  lastAppliedSyncRef.current = playbackUpdatedAt;
-
-  try {
-    const baseSeconds = Number(playbackSeconds || 0);
-    const updatedAtTime = new Date(playbackUpdatedAt).getTime();
-    const nowTime = Date.now();
-
-    const elapsedSeconds = Math.max(0, (nowTime - updatedAtTime) / 1000);
-
-    const correctedSeconds = isPlaying
-  ? baseSeconds + elapsedSeconds + syncCompensationSeconds
-  : baseSeconds;
-
-    player.seekTo(correctedSeconds, true);
-
-    if (isPlaying) {
-      player.playVideo();
-    } else {
-      player.pauseVideo();
+    if (!player || !videoId || !playbackUpdatedAt) {
+      return;
     }
-  } catch (error) {
-    console.error("No se pudo sincronizar el reproductor:", error);
-  }
-}, [videoId, isPlaying, playbackSeconds, playbackUpdatedAt]);
+
+    if (lastAppliedSyncRef.current === playbackUpdatedAt) {
+      return;
+    }
+
+    lastAppliedSyncRef.current = playbackUpdatedAt;
+
+    try {
+      const baseSeconds = Number(playbackSeconds || 0);
+      const updatedAtTime = new Date(playbackUpdatedAt).getTime();
+      const nowTime = Date.now();
+
+      const elapsedSeconds = Math.max(0, (nowTime - updatedAtTime) / 1000);
+      const correctedSeconds = isPlaying
+        ? baseSeconds + elapsedSeconds + syncCompensationSeconds
+        : baseSeconds;
+
+      player.seekTo(correctedSeconds, true);
+
+      if (isPlaying) {
+        player.playVideo();
+      } else {
+        player.pauseVideo();
+      }
+    } catch (error) {
+      console.error("No se pudo sincronizar el reproductor:", error);
+    }
+  }, [videoId, isPlaying, playbackSeconds, playbackUpdatedAt]);
 
   if (!videoId) {
     return <p>Todavía no hay video válido.</p>;

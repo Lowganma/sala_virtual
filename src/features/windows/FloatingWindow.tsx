@@ -1,25 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-
-type Position = {
-  x: number;
-  y: number;
-};
-
-type Size = {
-  width: number;
-  height: number;
-};
+import type { WindowPosition, WindowSize } from "./windowTypes";
 
 type FloatingWindowProps = {
   title: string;
   className?: string;
-  position: Position;
-  size: Size;
+  position: WindowPosition;
+  size: WindowSize;
   isSelected: boolean;
   onSelect: () => void;
-  onPositionChange: (nextPosition: Position) => void;
-  onSizeChange: (nextSize: Size) => void;
+  onPositionChange: (nextPosition: WindowPosition) => void;
+  onSizeChange: (nextSize: WindowSize) => void;
   children: ReactNode;
 };
 
@@ -34,8 +25,8 @@ export function FloatingWindow({
   onSizeChange,
   children,
 }: FloatingWindowProps) {
-  const [localPosition, setLocalPosition] = useState(position);
-  const [localSize, setLocalSize] = useState(size);
+  const [dragPosition, setDragPosition] = useState<WindowPosition | null>(null);
+  const [resizeSize, setResizeSize] = useState<WindowSize | null>(null);
 
   const [dragStart, setDragStart] = useState<{
     mouseX: number;
@@ -51,48 +42,41 @@ export function FloatingWindow({
     height: number;
   } | null>(null);
 
-  useEffect(() => {
-    if (dragStart) {
-      return;
-    }
-
-    setLocalPosition(position);
-  }, [position, dragStart]);
-
-  useEffect(() => {
-    if (resizeStart) {
-      return;
-    }
-
-    setLocalSize(size);
-  }, [size, resizeStart]);
+  const localPosition = useMemo(
+    () => dragPosition ?? position,
+    [dragPosition, position]
+  );
+  const localSize = useMemo(() => resizeSize ?? size, [resizeSize, size]);
 
   useEffect(() => {
     if (!dragStart) {
       return;
     }
 
+    const currentDragStart = dragStart as NonNullable<typeof dragStart>;
+
     let latestPosition = {
-      x: dragStart.windowX,
-      y: dragStart.windowY,
+      x: currentDragStart.windowX,
+      y: currentDragStart.windowY,
     };
 
     function handleWindowMouseMove(event: MouseEvent) {
       event.preventDefault();
 
-      const deltaX = event.clientX - dragStart.mouseX;
-      const deltaY = event.clientY - dragStart.mouseY;
+      const deltaX = event.clientX - currentDragStart.mouseX;
+      const deltaY = event.clientY - currentDragStart.mouseY;
 
       latestPosition = {
-        x: dragStart.windowX + deltaX,
-        y: dragStart.windowY + deltaY,
+        x: currentDragStart.windowX + deltaX,
+        y: currentDragStart.windowY + deltaY,
       };
 
-      setLocalPosition(latestPosition);
+      setDragPosition(latestPosition);
     }
 
     function handleWindowMouseUp() {
       setDragStart(null);
+      setDragPosition(null);
       onPositionChange(latestPosition);
       document.body.classList.remove("is-dragging-window");
     }
@@ -114,27 +98,30 @@ export function FloatingWindow({
       return;
     }
 
+    const currentResizeStart = resizeStart as NonNullable<typeof resizeStart>;
+
     let latestSize = {
-      width: resizeStart.width,
-      height: resizeStart.height,
+      width: currentResizeStart.width,
+      height: currentResizeStart.height,
     };
 
     function handleWindowMouseMove(event: MouseEvent) {
       event.preventDefault();
 
-      const deltaX = event.clientX - resizeStart.mouseX;
-      const deltaY = event.clientY - resizeStart.mouseY;
+      const deltaX = event.clientX - currentResizeStart.mouseX;
+      const deltaY = event.clientY - currentResizeStart.mouseY;
 
       latestSize = {
-        width: Math.max(180, resizeStart.width + deltaX),
-        height: Math.max(120, resizeStart.height + deltaY),
+        width: Math.max(180, currentResizeStart.width + deltaX),
+        height: Math.max(120, currentResizeStart.height + deltaY),
       };
 
-      setLocalSize(latestSize);
+      setResizeSize(latestSize);
     }
 
     function handleWindowMouseUp() {
       setResizeStart(null);
+      setResizeSize(null);
       onSizeChange(latestSize);
       document.body.classList.remove("is-dragging-window");
     }
@@ -151,41 +138,9 @@ export function FloatingWindow({
     };
   }, [resizeStart, onSizeChange]);
 
-  function handleHeaderMouseDown(event: React.MouseEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    onSelect();
-
-    setDragStart({
-      mouseX: event.clientX,
-      mouseY: event.clientY,
-      windowX: localPosition.x,
-      windowY: localPosition.y,
-    });
-  }
-
-  function handleResizeMouseDown(event: React.MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    onSelect();
-
-    setResizeStart({
-      mouseX: event.clientX,
-      mouseY: event.clientY,
-      width: localSize.width,
-      height: localSize.height,
-    });
-  }
-
   return (
     <section
-      className={
-        isSelected
-          ? `floating-window selected ${className}`
-          : `floating-window ${className}`
-      }
+      className={`floating-window ${className} ${isSelected ? "selected" : ""}`}
       style={{
         left: localPosition.x,
         top: localPosition.y,
@@ -199,20 +154,39 @@ export function FloatingWindow({
     >
       <header
         className="floating-window-header"
-        onMouseDown={handleHeaderMouseDown}
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onSelect();
+          setDragStart({
+            mouseX: event.clientX,
+            mouseY: event.clientY,
+            windowX: localPosition.x,
+            windowY: localPosition.y,
+          });
+        }}
       >
-        <span>{title}</span>
+        <strong>{title}</strong>
+        <span>⋮</span>
       </header>
 
       <div className="floating-window-body">{children}</div>
 
-      {isSelected && (
-        <button
-          className="window-resize-handle"
-          onMouseDown={handleResizeMouseDown}
-          aria-label="Redimensionar ventana"
-        />
-      )}
+      <button
+        className="window-resize-handle"
+        aria-label="Redimensionar ventana"
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onSelect();
+          setResizeStart({
+            mouseX: event.clientX,
+            mouseY: event.clientY,
+            width: localSize.width,
+            height: localSize.height,
+          });
+        }}
+      />
     </section>
   );
 }

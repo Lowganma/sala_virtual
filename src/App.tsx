@@ -1,27 +1,35 @@
-import { useEffect,useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import "./App.css";
-
-import { supabase } from "./lib/supabaseClient";
-import type { Room,RoomMessage, RoomState, RoomWindow } from "./types/room";
 
 import { HomeScreen } from "./components/HomeScreen";
 import { RoomScreen } from "./components/RoomScreen";
-
-import type { YouTubePlayerHandle } from "./components/YoutubePlayer";
-
 import type { CanvasImageLayer } from "./features/canvas/canvasTypes";
-
-function generateRoomCode() {
-  const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-
-  for (let i = 0; i < 6; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    code += characters[randomIndex];
-  }
-
-  return code;
-}
+import { generateRoomCode } from "./features/rooms/roomCode";
+import { useRoomRealtime } from "./features/rooms/useRoomRealtime";
+import type { WindowPosition, WindowSize } from "./features/windows/windowTypes";
+import type { YouTubePlayerHandle } from "./features/music/YoutubePlayer";
+import {
+  deleteCanvasLayer as deleteCanvasLayerRow,
+  fetchCanvasLayers,
+  fetchRoomMessages,
+  fetchRoomState,
+  fetchRoomWindows,
+  findRoomByCode,
+  insertCanvasLayer,
+  insertChatMessage,
+  insertDefaultRoomWindows,
+  insertInitialRoomState,
+  insertRoom,
+  updateCanvasLayerPosition as updateCanvasLayerPositionRow,
+  updateCanvasLayerSize as updateCanvasLayerSizeRow,
+  updateRoomPlayback,
+  updateRoomWindowMinimized as updateRoomWindowMinimizedRow,
+  updateRoomWindowPosition as updateRoomWindowPositionRow,
+  updateRoomWindowSize as updateRoomWindowSizeRow,
+  updateRoomYoutubeUrl,
+  uploadCanvasAsset,
+} from "./lib/roomRepository";
+import type { Room, RoomMessage, RoomState, RoomWindow } from "./types/room";
 
 function App() {
   const [username, setUsername] = useState("");
@@ -39,7 +47,6 @@ function App() {
   const [roomWindows, setRoomWindows] = useState<RoomWindow[]>([]);
 
   const youtubePlayerRef = useRef<YouTubePlayerHandle | null>(null);
-  const [sharedMessage, setSharedMessage] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [savingYoutube, setSavingYoutube] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -48,191 +55,78 @@ function App() {
   const [syncingPlayback, setSyncingPlayback] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-  if (!currentRoomState) {
-    return;
-  }
+  const applyRoomState = useCallback((nextState: RoomState) => {
+    setCurrentRoomState(nextState);
+    setYoutubeUrl(nextState.youtube_url || "");
+    setIsPlaying(Boolean(nextState.is_playing));
+    setPlaybackSeconds(Number(nextState.playback_seconds || 0));
+    setPlaybackUpdatedAt(nextState.playback_updated_at || "");
+  }, []);
 
-  const channel = supabase
-    .channel(`room-state-${currentRoomState.id}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "room_state",
-        filter: `id=eq.${currentRoomState.id}`,
-      },
-      (payload) => {
-        const newState = payload.new as RoomState;
+  const mergeRoomWindow = useCallback((changedWindow: RoomWindow) => {
+    setRoomWindows((currentWindows) => {
+      const exists = currentWindows.some(
+        (roomWindow) => roomWindow.id === changedWindow.id
+      );
 
-        setCurrentRoomState(newState);
-        setSharedMessage(newState.message || "");
-        setYoutubeUrl(newState.youtube_url || "");
-        setIsPlaying(Boolean(newState.is_playing));
-        setPlaybackSeconds(Number(newState.playback_seconds || 0));
-        setPlaybackUpdatedAt(newState.playback_updated_at || "");
+      if (!exists) {
+        return [...currentWindows, changedWindow];
       }
-    )
-    .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [currentRoomState?.id]);
+      return currentWindows.map((roomWindow) =>
+        roomWindow.id === changedWindow.id ? changedWindow : roomWindow
+      );
+    });
+  }, []);
 
-  useEffect(() => {
-  if (!currentRoom) {
-    return;
-  }
+  const mergeCanvasLayer = useCallback((changedLayer: CanvasImageLayer) => {
+    setCanvasLayers((currentLayers) => {
+      const exists = currentLayers.some((layer) => layer.id === changedLayer.id);
 
-  const channel = supabase
-    .channel(`room-messages-${currentRoom.id}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "room_messages",
-        filter: `room_id=eq.${currentRoom.id}`,
-      },
-      (payload) => {
-        const newMessage = payload.new as RoomMessage;
-
-        setChatMessages((currentMessages) => {
-          const alreadyExists = currentMessages.some(
-            (message) => message.id === newMessage.id
-          );
-
-          if (alreadyExists) {
-            return currentMessages;
-          }
-
-          return [...currentMessages, newMessage];
-        });
+      if (!exists) {
+        return [...currentLayers, changedLayer];
       }
-    )
-    .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [currentRoom?.id]);
+      return currentLayers.map((layer) =>
+        layer.id === changedLayer.id ? changedLayer : layer
+      );
+    });
+  }, []);
 
-  useEffect(() => {
-  if (!currentRoom) {
-    return;
-  }
+  const removeCanvasLayerFromState = useCallback((id: string) => {
+    setCanvasLayers((currentLayers) =>
+      currentLayers.filter((layer) => layer.id !== id)
+    );
+  }, []);
 
-  const channel = supabase
-    .channel(`room-windows-${currentRoom.id}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "room_windows",
-        filter: `room_id=eq.${currentRoom.id}`,
-      },
-      (payload) => {
-        const changedWindow = payload.new as RoomWindow;
+  const addRealtimeChatMessage = useCallback((newMessage: RoomMessage) => {
+    setChatMessages((currentMessages) => {
+      const alreadyExists = currentMessages.some(
+        (message) => message.id === newMessage.id
+      );
 
-        setRoomWindows((currentWindows) => {
-          const exists = currentWindows.some(
-            (roomWindow) => roomWindow.id === changedWindow.id
-          );
-
-          if (!exists) {
-            return [...currentWindows, changedWindow];
-          }
-
-          return currentWindows.map((roomWindow) =>
-            roomWindow.id === changedWindow.id ? changedWindow : roomWindow
-          );
-        });
+      if (alreadyExists) {
+        return currentMessages;
       }
-    )
-    .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [currentRoom?.id]);
+      return [...currentMessages, newMessage];
+    });
+  }, []);
 
-  useEffect(() => {
-  if (!currentRoom) {
-    return;
-  }
-
-  const channel = supabase
-    .channel(`canvas-layers-${currentRoom.id}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "canvas_layers",
-        filter: `room_id=eq.${currentRoom.id}`,
-      },
-      (payload) => {
-        if (payload.eventType === "DELETE") {
-          const deletedLayer = payload.old as { id: string };
-
-          setCanvasLayers((currentLayers) =>
-            currentLayers.filter((layer) => layer.id !== deletedLayer.id)
-          );
-
-          return;
-        }
-
-        const changedLayer = payload.new as any;
-
-        const normalizedLayer: CanvasImageLayer = {
-          id: changedLayer.id,
-          room_id: changedLayer.room_id,
-          type: changedLayer.type,
-          src: changedLayer.src,
-          x: Number(changedLayer.x),
-          y: Number(changedLayer.y),
-          w: Number(changedLayer.w),
-          h: Number(changedLayer.h),
-          z: Number(changedLayer.z_index),
-          z_index: Number(changedLayer.z_index),
-          created_at: changedLayer.created_at,
-          updated_at: changedLayer.updated_at,
-        };
-
-        setCanvasLayers((currentLayers) => {
-          const exists = currentLayers.some(
-            (layer) => layer.id === normalizedLayer.id
-          );
-
-          if (!exists) {
-            return [...currentLayers, normalizedLayer];
-          }
-
-          return currentLayers.map((layer) =>
-            layer.id === normalizedLayer.id ? normalizedLayer : layer
-          );
-        });
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [currentRoom?.id]);
+  useRoomRealtime({
+    room: currentRoom,
+    roomState: currentRoomState,
+    onRoomStateChange: applyRoomState,
+    onMessageInsert: addRealtimeChatMessage,
+    onWindowChange: mergeRoomWindow,
+    onCanvasLayerDelete: removeCanvasLayerFromState,
+    onCanvasLayerChange: mergeCanvasLayer,
+  });
 
   async function loadRoomState(roomId: string) {
-    const { data, error } = await supabase
-      .from("room_state")
-      .select("*")
-      .eq("room_id", roomId)
-      .single();
+    const { data, error } = await fetchRoomState(roomId);
 
     if (error || !data) {
       console.error(error);
@@ -240,103 +134,61 @@ function App() {
       return null;
     }
 
-    setCurrentRoomState(data);
-    setSharedMessage(data.message || "");
-    setYoutubeUrl(data.youtube_url || "");
-    setIsPlaying(Boolean(data.is_playing));
-    setPlaybackSeconds(Number(data.playback_seconds || 0));
-    setPlaybackUpdatedAt(data.playback_updated_at || "");
-
+    applyRoomState(data);
     return data;
   }
 
   async function loadRoomMessages(roomId: string) {
-  const { data, error } = await supabase
-    .from("room_messages")
-    .select("*")
-    .eq("room_id", roomId)
-    .order("created_at", { ascending: true });
+    const { data, error } = await fetchRoomMessages(roomId);
 
-  if (error || !data) {
-    console.error(error);
-    setMessage("No se pudieron cargar los mensajes del chat.");
-    return;
+    if (error || !data) {
+      console.error(error);
+      setMessage("No se pudieron cargar los mensajes del chat.");
+      return;
+    }
+
+    setChatMessages(data);
   }
-
-  setChatMessages(data);
-}
 
   async function loadOrCreateRoomWindows(roomId: string) {
-  const { data: existingWindows, error: selectError } = await supabase
-    .from("room_windows")
-    .select("*")
-    .eq("room_id", roomId);
+    const { data: existingWindows, error: selectError } = await fetchRoomWindows(
+      roomId
+    );
 
-  if (selectError) {
-    console.error(selectError);
-    setMessage("No se pudieron cargar las ventanas de la sala.");
-    return;
+    if (selectError) {
+      console.error(selectError);
+      setMessage("No se pudieron cargar las ventanas de la sala.");
+      return;
+    }
+
+    if (existingWindows && existingWindows.length > 0) {
+      setRoomWindows(existingWindows);
+      return;
+    }
+
+    const { data: createdWindows, error: insertError } =
+      await insertDefaultRoomWindows(roomId);
+
+    if (insertError || !createdWindows) {
+      console.error(insertError);
+      setMessage("No se pudieron crear las ventanas iniciales.");
+      return;
+    }
+
+    setRoomWindows(createdWindows);
   }
-
-  if (existingWindows && existingWindows.length > 0) {
-    setRoomWindows(existingWindows);
-    return;
-  }
-
-  const windowsToInsert = DEFAULT_WINDOWS.map((windowConfig) => ({
-  room_id: roomId,
-  window_key: windowConfig.window_key,
-  x: windowConfig.x,
-  y: windowConfig.y,
-  width: windowConfig.width,
-  height: windowConfig.height,
-  is_minimized: windowConfig.is_minimized,
-}));
-
-  const { data: createdWindows, error: insertError } = await supabase
-    .from("room_windows")
-    .insert(windowsToInsert)
-    .select();
-
-  if (insertError || !createdWindows) {
-    console.error(insertError);
-    setMessage("No se pudieron crear las ventanas iniciales.");
-    return;
-  }
-
-  setRoomWindows(createdWindows);
-}
 
   async function loadCanvasLayers(roomId: string) {
-  const { data, error } = await supabase
-    .from("canvas_layers")
-    .select("*")
-    .eq("room_id", roomId)
-    .order("z_index", { ascending: true });
+    const { data, error } = await fetchCanvasLayers(roomId);
 
-  if (error || !data) {
-    console.error(error);
-    setMessage("No se pudieron cargar los elementos del canvas.");
-    return;
+    if (error || !data) {
+      console.error(error);
+      setMessage("No se pudieron cargar los elementos del canvas.");
+      return;
+    }
+
+    setCanvasLayers(data);
   }
-
-  const normalizedLayers: CanvasImageLayer[] = data.map((layer) => ({
-    id: layer.id,
-    room_id: layer.room_id,
-    type: layer.type,
-    src: layer.src,
-    x: Number(layer.x),
-    y: Number(layer.y),
-    w: Number(layer.w),
-    h: Number(layer.h),
-    z: Number(layer.z_index),
-    z_index: Number(layer.z_index),
-    created_at: layer.created_at,
-    updated_at: layer.updated_at,
-  }));
-
-  setCanvasLayers(normalizedLayers);
-}
 
   async function createRoom() {
     setLoading(true);
@@ -344,12 +196,7 @@ function App() {
 
     try {
       const code = generateRoomCode();
-
-      const { data: roomData, error: roomError } = await supabase
-        .from("rooms")
-        .insert({ code })
-        .select()
-        .single();
+      const { data: roomData, error: roomError } = await insertRoom(code);
 
       if (roomError || !roomData) {
         console.error(roomError);
@@ -357,18 +204,8 @@ function App() {
         return;
       }
 
-      const { data: stateData, error: stateError } = await supabase
-        .from("room_state")
-        .insert({
-          room_id: roomData.id,
-          message: "",
-          youtube_url: "",
-          is_playing: false,
-          playback_seconds: 0,
-          playback_updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      const { data: stateData, error: stateError } =
+        await insertInitialRoomState(roomData.id);
 
       if (stateError || !stateData) {
         console.error(stateError);
@@ -377,12 +214,7 @@ function App() {
       }
 
       setCurrentRoom(roomData);
-      setCurrentRoomState(stateData);
-      setSharedMessage(stateData.message || "");
-      setYoutubeUrl(stateData.youtube_url || "");
-      setIsPlaying(Boolean(stateData.is_playing));
-      setPlaybackSeconds(Number(stateData.playback_seconds || 0));
-      setPlaybackUpdatedAt(stateData.playback_updated_at || "");
+      applyRoomState(stateData);
       setChatMessages([]);
       await loadOrCreateRoomWindows(roomData.id);
       await loadCanvasLayers(roomData.id);
@@ -393,33 +225,6 @@ function App() {
       setLoading(false);
     }
   }
-
-    const DEFAULT_WINDOWS = [
-  {
-    window_key: "room-info",
-    x: 120,
-    y: 120,
-    width: 280,
-    height: 220,
-    is_minimized: false,
-  },
-  {
-    window_key: "music",
-    x: 440,
-    y: 120,
-    width: 340,
-    height: 520,
-    is_minimized: false,
-  },
-  {
-    window_key: "chat",
-    x: 820,
-    y: 120,
-    width: 340,
-    height: 360,
-    is_minimized: false,
-  },
-];
 
   async function joinRoom() {
     setLoading(true);
@@ -433,11 +238,9 @@ function App() {
         return;
       }
 
-      const { data: roomData, error: roomError } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("code", cleanCode)
-        .single();
+      const { data: roomData, error: roomError } = await findRoomByCode(
+        cleanCode
+      );
 
       if (roomError || !roomData) {
         console.error(roomError);
@@ -458,443 +261,302 @@ function App() {
     }
   }
 
-  async function saveSharedMessage() {
+  async function saveYoutubeUrl() {
     if (!currentRoomState) {
       setMessage("No hay estado de sala para actualizar.");
       return;
     }
 
-    setSaving(true);
+    setSavingYoutube(true);
     setMessage("");
 
     try {
-      const { data, error } = await supabase
-        .from("room_state")
-        .update({
-          message: sharedMessage,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", currentRoomState.id)
-        .select()
-        .single();
+      const { data, error } = await updateRoomYoutubeUrl(
+        currentRoomState.id,
+        youtubeUrl
+      );
 
       if (error || !data) {
         console.error(error);
-        setMessage("No se pudo guardar el mensaje.");
+        setMessage("No se pudo guardar el enlace de YouTube.");
         return;
       }
 
-      setCurrentRoomState(data);
+      applyRoomState(data);
     } catch (error) {
       console.error(error);
-      setMessage("Ocurrió un error al guardar el mensaje.");
+      setMessage("Ocurrió un error al guardar el enlace de YouTube.");
     } finally {
-      setSaving(false);
+      setSavingYoutube(false);
     }
   }
 
-  async function saveYoutubeUrl() {
-  if (!currentRoomState) {
-    setMessage("No hay estado de sala para actualizar.");
-    return;
-  }
-
-  setSavingYoutube(true);
-  setMessage("");
-
-  try {
-    const { data, error } = await supabase
-      .from("room_state")
-      .update({
-        youtube_url: youtubeUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", currentRoomState.id)
-      .select()
-      .single();
-
-    if (error || !data) {
-      console.error(error);
-      setMessage("No se pudo guardar el enlace de YouTube.");
+  async function updatePlayback(nextIsPlaying: boolean, nextSeconds: number) {
+    if (!currentRoomState) {
+      setMessage("No hay estado de sala para actualizar.");
       return;
     }
 
-    setCurrentRoomState(data);
-    setYoutubeUrl(data.youtube_url || "");
-  } catch (error) {
-    console.error(error);
-    setMessage("Ocurrió un error al guardar el enlace de YouTube.");
-  } finally {
-    setSavingYoutube(false);
-  }
-}
+    setSyncingPlayback(true);
+    setMessage("");
 
-async function updatePlayback(nextIsPlaying: boolean, nextSeconds: number) {
-  if (!currentRoomState) {
-    setMessage("No hay estado de sala para actualizar.");
-    return;
-  }
+    try {
+      const { data, error } = await updateRoomPlayback(
+        currentRoomState.id,
+        nextIsPlaying,
+        nextSeconds
+      );
 
-  setSyncingPlayback(true);
-  setMessage("");
+      if (error || !data) {
+        console.error(error);
+        setMessage("No se pudo sincronizar la reproducción.");
+        return;
+      }
 
-  try {
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from("room_state")
-      .update({
-        is_playing: nextIsPlaying,
-        playback_seconds: nextSeconds,
-        playback_updated_at: now,
-        updated_at: now,
-      })
-      .eq("id", currentRoomState.id)
-      .select()
-      .single();
-
-    if (error || !data) {
+      applyRoomState(data);
+    } catch (error) {
       console.error(error);
-      setMessage("No se pudo sincronizar la reproducción.");
-      return;
+      setMessage("Ocurrió un error al sincronizar la reproducción.");
+    } finally {
+      setSyncingPlayback(false);
     }
-
-    setCurrentRoomState(data);
-    setIsPlaying(Boolean(data.is_playing));
-    setPlaybackSeconds(Number(data.playback_seconds || 0));
-    setPlaybackUpdatedAt(data.playback_updated_at || "");
-  } catch (error) {
-    console.error(error);
-    setMessage("Ocurrió un error al sincronizar la reproducción.");
-  } finally {
-    setSyncingPlayback(false);
   }
-}
 
-function playForEveryone() {
-  const currentSeconds = youtubePlayerRef.current?.getCurrentTime() ?? playbackSeconds;
-  updatePlayback(true, currentSeconds);
-}
+  function playForEveryone() {
+    const currentSeconds =
+      youtubePlayerRef.current?.getCurrentTime() ?? playbackSeconds;
+    void updatePlayback(true, currentSeconds);
+  }
 
-function pauseForEveryone() {
-  const currentSeconds = youtubePlayerRef.current?.getCurrentTime() ?? playbackSeconds;
-  updatePlayback(false, currentSeconds);
-}
+  function pauseForEveryone() {
+    const currentSeconds =
+      youtubePlayerRef.current?.getCurrentTime() ?? playbackSeconds;
+    void updatePlayback(false, currentSeconds);
+  }
 
-function syncToStart() {
-  updatePlayback(false, 0);
-}
+  function syncToStart() {
+    void updatePlayback(false, 0);
+  }
 
   async function sendChatMessage() {
-  if (!currentRoom) {
-    setMessage("No hay sala activa.");
-    return;
-  }
-
-  const cleanContent = chatInput.trim();
-
-  if (!cleanContent) {
-    return;
-  }
-
-  setSendingChatMessage(true);
-
-  try {
-    const { error } = await supabase.from("room_messages").insert({
-      room_id: currentRoom.id,
-      username: username.trim() || "Invitado",
-      content: cleanContent,
-    });
-
-    if (error) {
-      console.error(error);
-      setMessage("No se pudo enviar el mensaje.");
+    if (!currentRoom) {
+      setMessage("No hay sala activa.");
       return;
     }
 
-    setChatInput("");
-  } catch (error) {
-    console.error(error);
-    setMessage("Ocurrió un error al enviar el mensaje.");
-  } finally {
-    setSendingChatMessage(false);
+    const cleanContent = chatInput.trim();
+
+    if (!cleanContent) {
+      return;
+    }
+
+    setSendingChatMessage(true);
+
+    try {
+      const { error } = await insertChatMessage(
+        currentRoom.id,
+        username.trim() || "Invitado",
+        cleanContent
+      );
+
+      if (error) {
+        console.error(error);
+        setMessage("No se pudo enviar el mensaje.");
+        return;
+      }
+
+      setChatInput("");
+    } catch (error) {
+      console.error(error);
+      setMessage("Ocurrió un error al enviar el mensaje.");
+    } finally {
+      setSendingChatMessage(false);
+    }
   }
-}
 
   async function updateRoomWindowPosition(
-  windowKey: string,
-  nextPosition: { x: number; y: number }
-) {
-  if (!currentRoom) {
-    return;
+    windowKey: string,
+    nextPosition: WindowPosition
+  ) {
+    if (!currentRoom) {
+      return;
+    }
+
+    const { data, error } = await updateRoomWindowPositionRow(
+      currentRoom.id,
+      windowKey,
+      nextPosition
+    );
+
+    if (error || !data) {
+      console.error(error);
+      setMessage("No se pudo guardar la posición de la ventana.");
+      return;
+    }
+
+    mergeRoomWindow(data);
   }
-
-  const { data, error } = await supabase
-    .from("room_windows")
-    .update({
-      x: nextPosition.x,
-      y: nextPosition.y,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("room_id", currentRoom.id)
-    .eq("window_key", windowKey)
-    .select()
-    .single();
-
-  if (error || !data) {
-    console.error(error);
-    setMessage("No se pudo guardar la posición de la ventana.");
-    return;
-  }
-
-  setRoomWindows((currentWindows) =>
-    currentWindows.map((roomWindow) =>
-      roomWindow.id === data.id ? data : roomWindow
-    )
-  );
-}
 
   async function updateRoomWindowMinimized(
-  windowKey: string,
-  nextIsMinimized: boolean
-) {
-  if (!currentRoom) {
-    return;
+    windowKey: string,
+    nextIsMinimized: boolean
+  ) {
+    if (!currentRoom) {
+      return;
+    }
+
+    const { data, error } = await updateRoomWindowMinimizedRow(
+      currentRoom.id,
+      windowKey,
+      nextIsMinimized
+    );
+
+    if (error || !data) {
+      console.error(error);
+      setMessage("No se pudo actualizar el estado de la ventana.");
+      return;
+    }
+
+    mergeRoomWindow(data);
   }
 
-  const { data, error } = await supabase
-    .from("room_windows")
-    .update({
-      is_minimized: nextIsMinimized,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("room_id", currentRoom.id)
-    .eq("window_key", windowKey)
-    .select()
-    .single();
+  async function updateRoomWindowSize(windowKey: string, nextSize: WindowSize) {
+    if (!currentRoom) {
+      return;
+    }
 
-  if (error || !data) {
-    console.error(error);
-    setMessage("No se pudo actualizar el estado de la ventana.");
-    return;
+    const { data, error } = await updateRoomWindowSizeRow(
+      currentRoom.id,
+      windowKey,
+      nextSize
+    );
+
+    if (error || !data) {
+      console.error(error);
+      setMessage("No se pudo guardar el tamaño de la ventana.");
+      return;
+    }
+
+    mergeRoomWindow(data);
   }
-
-  setRoomWindows((currentWindows) =>
-    currentWindows.map((roomWindow) =>
-      roomWindow.id === data.id ? data : roomWindow
-    )
-  );
-}
-
-  async function updateRoomWindowSize(
-  windowKey: string,
-  nextSize: { width: number; height: number }
-) {
-  if (!currentRoom) {
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("room_windows")
-    .update({
-      width: nextSize.width,
-      height: nextSize.height,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("room_id", currentRoom.id)
-    .eq("window_key", windowKey)
-    .select()
-    .single();
-
-  if (error || !data) {
-    console.error(error);
-    setMessage("No se pudo guardar el tamaño de la ventana.");
-    return;
-  }
-
-  setRoomWindows((currentWindows) =>
-    currentWindows.map((roomWindow) =>
-      roomWindow.id === data.id ? data : roomWindow
-    )
-  );
-}
-
-  async function uploadCanvasFile(file: File) {
-  if (!currentRoom) {
-    return null;
-  }
-
-  const extension = file.name.split(".").pop() || "png";
-  const safeExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const filePath = `${currentRoom.id}/${crypto.randomUUID()}.${safeExtension}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("canvas-assets")
-    .upload(filePath, file, {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error(uploadError);
-    setMessage("No se pudo subir la imagen al Storage.");
-    return null;
-  }
-
-  const { data } = supabase.storage
-    .from("canvas-assets")
-    .getPublicUrl(filePath);
-
-  return data.publicUrl;
-}
 
   async function createCanvasLayer(payload: {
-  type: "image" | "gif";
-  src: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  file?: File;
-}) {
-  if (!currentRoom) {
-    return;
-  }
-  let finalSrc = payload.src;
+    type: "image" | "gif";
+    src: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    file?: File;
+  }) {
+    if (!currentRoom) {
+      return;
+    }
 
-if (payload.file) {
-  const uploadedUrl = await uploadCanvasFile(payload.file);
+    let finalSrc = payload.src;
 
-  if (!uploadedUrl) {
-    return;
-  }
+    if (payload.file) {
+      const { data: uploadedUrl, error } = await uploadCanvasAsset(
+        currentRoom.id,
+        payload.file
+      );
 
-  finalSrc = uploadedUrl;
-}
+      if (error || !uploadedUrl) {
+        console.error(error);
+        setMessage("No se pudo subir la imagen al Storage.");
+        return;
+      }
 
-  const nextZ =
-    canvasLayers.length === 0
-      ? 30
-      : Math.max(...canvasLayers.map((layer) => layer.z || 0)) + 1;
+      finalSrc = uploadedUrl;
+    }
 
-  const { data, error } = await supabase
-    .from("canvas_layers")
-    .insert({
-      room_id: currentRoom.id,
+    const nextZ =
+      canvasLayers.length === 0
+        ? 30
+        : Math.max(...canvasLayers.map((layer) => layer.z || 0)) + 1;
+
+    const { data, error } = await insertCanvasLayer({
+      roomId: currentRoom.id,
       type: payload.type,
       src: finalSrc,
       x: payload.x,
       y: payload.y,
       w: payload.w,
       h: payload.h,
-      z_index: nextZ,
-    })
-    .select()
-    .single();
+      zIndex: nextZ,
+    });
 
-  if (error || !data) {
-    console.error(error);
-    setMessage("No se pudo agregar el elemento al canvas.");
-    return;
+    if (error || !data) {
+      console.error(error);
+      setMessage("No se pudo agregar el elemento al canvas.");
+      return;
+    }
+
+    mergeCanvasLayer(data);
   }
 
-  const normalizedLayer: CanvasImageLayer = {
-    id: data.id,
-    room_id: data.room_id,
-    type: data.type,
-    src: data.src,
-    x: Number(data.x),
-    y: Number(data.y),
-    w: Number(data.w),
-    h: Number(data.h),
-    z: Number(data.z_index),
-    z_index: Number(data.z_index),
-    created_at: data.created_at,
-    updated_at: data.updated_at,
-  };
+  async function updateCanvasLayerPosition(
+    id: string,
+    nextPosition: WindowPosition
+  ) {
+    setCanvasLayers((currentLayers) =>
+      currentLayers.map((layer) =>
+        layer.id === id
+          ? {
+              ...layer,
+              x: nextPosition.x,
+              y: nextPosition.y,
+            }
+          : layer
+      )
+    );
 
-  setCanvasLayers((currentLayers) => [...currentLayers, normalizedLayer]);
-}
+    const { error } = await updateCanvasLayerPositionRow(id, nextPosition);
 
-async function updateCanvasLayerPosition(
-  id: string,
-  nextPosition: { x: number; y: number }
-) {
-  setCanvasLayers((currentLayers) =>
-    currentLayers.map((layer) =>
-      layer.id === id
-        ? {
-            ...layer,
-            x: nextPosition.x,
-            y: nextPosition.y,
-          }
-        : layer
-    )
-  );
-
-  const { error } = await supabase
-    .from("canvas_layers")
-    .update({
-      x: nextPosition.x,
-      y: nextPosition.y,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-
-  if (error) {
-    console.error(error);
-    setMessage("No se pudo mover el elemento.");
+    if (error) {
+      console.error(error);
+      setMessage("No se pudo mover el elemento.");
+    }
   }
-}
 
-async function updateCanvasLayerSize(
-  id: string,
-  nextSize: { w: number; h: number }
-) {
-  setCanvasLayers((currentLayers) =>
-    currentLayers.map((layer) =>
-      layer.id === id
-        ? {
-            ...layer,
-            w: nextSize.w,
-            h: nextSize.h,
-          }
-        : layer
-    )
-  );
+  async function updateCanvasLayerSize(
+    id: string,
+    nextSize: { w: number; h: number }
+  ) {
+    setCanvasLayers((currentLayers) =>
+      currentLayers.map((layer) =>
+        layer.id === id
+          ? {
+              ...layer,
+              w: nextSize.w,
+              h: nextSize.h,
+            }
+          : layer
+      )
+    );
 
-  const { error } = await supabase
-    .from("canvas_layers")
-    .update({
-      w: nextSize.w,
-      h: nextSize.h,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
+    const { error } = await updateCanvasLayerSizeRow(id, nextSize);
 
-  if (error) {
-    console.error(error);
-    setMessage("No se pudo redimensionar el elemento.");
+    if (error) {
+      console.error(error);
+      setMessage("No se pudo redimensionar el elemento.");
+    }
   }
-}
 
-async function deleteCanvasLayer(id: string) {
-  setCanvasLayers((currentLayers) =>
-    currentLayers.filter((layer) => layer.id !== id)
-  );
+  async function deleteCanvasLayer(id: string) {
+    removeCanvasLayerFromState(id);
 
-  const { error } = await supabase.from("canvas_layers").delete().eq("id", id);
+    const { error } = await deleteCanvasLayerRow(id);
 
-  if (error) {
-    console.error(error);
-    setMessage("No se pudo eliminar el elemento.");
+    if (error) {
+      console.error(error);
+      setMessage("No se pudo eliminar el elemento.");
+    }
   }
-}
 
   function leaveRoom() {
     setCurrentRoom(null);
     setCurrentRoomState(null);
-    setSharedMessage("");
     setYoutubeUrl("");
     setIsPlaying(false);
     setPlaybackSeconds(0);
@@ -913,19 +575,15 @@ async function deleteCanvasLayer(id: string) {
           room={currentRoom}
           roomState={currentRoomState}
           username={username}
-          sharedMessage={sharedMessage}
           youtubeUrl={youtubeUrl}
           isPlaying={isPlaying}
           playbackSeconds={playbackSeconds}
           playbackUpdatedAt={playbackUpdatedAt}
-          saving={saving}
           savingYoutube={savingYoutube}
           syncingPlayback={syncingPlayback}
           youtubePlayerRef={youtubePlayerRef}
           onWindowSizeChange={updateRoomWindowSize}
-          onSharedMessageChange={setSharedMessage}
           onYoutubeUrlChange={setYoutubeUrl}
-          onSaveMessage={saveSharedMessage}
           onSaveYoutubeUrl={saveYoutubeUrl}
           onPlayForEveryone={playForEveryone}
           onPauseForEveryone={pauseForEveryone}

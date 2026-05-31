@@ -1,4 +1,4 @@
-import type { RoomMessage } from "../types/room";
+import type { RoomMessage } from "../../types/room";
 
 type ChatPanelProps = {
   chatMessages: RoomMessage[];
