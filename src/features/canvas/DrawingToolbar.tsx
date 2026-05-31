@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type {
   DrawingLayerType,
   DrawingSettings,
@@ -26,6 +27,7 @@ export function DrawingToolbar({
   onUndoStroke,
   onClearLayer,
 }: DrawingToolbarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const isBrush = settings.tool === "brush";
 
   function updateSettings(partialSettings: Partial<DrawingSettings>) {
@@ -35,12 +37,37 @@ export function DrawingToolbar({
     });
   }
 
+  if (isCollapsed) {
+    return (
+      <button
+        type="button"
+        className="drawing-toolbar-toggle"
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={() => setIsCollapsed(false)}
+        aria-label="Mostrar herramientas de dibujo"
+        title="Mostrar herramientas de dibujo"
+      >
+        ✏️ Dibujo
+      </button>
+    );
+  }
+
   return (
     <div
       className="drawing-toolbar"
       onMouseDown={(event) => event.stopPropagation()}
       aria-label="Herramientas de dibujo"
     >
+      <button
+        type="button"
+        className="drawing-toolbar-collapse-button"
+        onClick={() => setIsCollapsed(true)}
+        aria-label="Ocultar herramientas de dibujo"
+        title="Ocultar herramientas de dibujo"
+      >
+        −
+      </button>
+
       <div className="drawing-tool-buttons">
         {TOOL_LABELS.map(({ tool, label, title }) => (
           <button
