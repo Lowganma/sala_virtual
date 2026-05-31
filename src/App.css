@@ -731,11 +731,11 @@ hr {
 }
 
 .background-drawing-canvas {
-  z-index: 0;
+  z-index: 1;
 }
 
 .canvas-world-grid {
-  z-index: 1;
+  z-index: 0;
   pointer-events: none;
 }
 

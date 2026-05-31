@@ -292,7 +292,6 @@ export function CanvasViewport({
           height={WORLD_HEIGHT}
           strokes={strokes}
           previewStroke={previewStroke}
-          settings={drawingSettings}
           className="drawing-canvas background-drawing-canvas"
         />
 
@@ -313,7 +312,6 @@ export function CanvasViewport({
           height={WORLD_HEIGHT}
           strokes={strokes}
           previewStroke={previewStroke}
-          settings={drawingSettings}
           className="drawing-canvas overlay-drawing-canvas"
         />
       </div>
