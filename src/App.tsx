@@ -624,6 +624,7 @@ function App() {
     <main className="app">
       {currentRoom ? (
         <RoomScreen
+          key={currentRoom.id}
           room={currentRoom}
           roomState={currentRoomState}
           username={username}

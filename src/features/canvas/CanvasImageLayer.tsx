@@ -5,7 +5,8 @@ import type { CanvasImageLayer as CanvasImageLayerType } from "./canvasTypes";
 type CanvasImageLayerProps = {
   layer: CanvasImageLayerType;
   isSelected: boolean;
-  onSelect: (id: string) => void;
+  isLocked: boolean;
+  onSelect: (id: string, addToSelection: boolean) => void;
   onMove: (id: string, nextPosition: { x: number; y: number }) => void;
   onResize: (id: string, nextSize: { w: number; h: number }) => void;
   zIndex: number;
@@ -18,6 +19,7 @@ type CanvasImageLayerProps = {
 export function CanvasImageLayer({
   layer,
   isSelected,
+  isLocked,
   onSelect,
   onMove,
   onResize,
@@ -33,7 +35,11 @@ export function CanvasImageLayer({
     event.preventDefault();
     event.stopPropagation();
 
-    onSelect(layer.id);
+    onSelect(layer.id, event.shiftKey);
+
+    if (isLocked) {
+      return;
+    }
 
     const startMouseX = event.clientX;
     const startMouseY = event.clientY;
@@ -66,7 +72,11 @@ export function CanvasImageLayer({
     event.preventDefault();
     event.stopPropagation();
 
-    onSelect(layer.id);
+    onSelect(layer.id, event.shiftKey);
+
+    if (isLocked) {
+      return;
+    }
 
     const startMouseX = event.clientX;
     const startMouseY = event.clientY;
@@ -97,7 +107,9 @@ export function CanvasImageLayer({
 
   return (
     <div
-      className={isSelected ? "canvas-layer selected" : "canvas-layer"}
+      className={`${isSelected ? "canvas-layer selected" : "canvas-layer"} ${
+        isLocked ? "locked" : ""
+      }`}
       style={{
         left: layer.x,
         top: layer.y,
@@ -124,21 +136,27 @@ export function CanvasImageLayer({
 
       {isSelected && (
         <>
-          <LayerControls
-            label="Capa"
-            layerIndex={layerIndex}
-            layerCount={layerCount}
-            canMoveBackward={layerIndex > 1}
-            canMoveForward={layerIndex < layerCount}
-            onMoveBackward={() => onMoveBackward(layer.id)}
-            onMoveForward={() => onMoveForward(layer.id)}
-          />
+          {isLocked ? (
+            <span className="lock-badge">Bloqueado</span>
+          ) : (
+            <LayerControls
+              label="Capa"
+              layerIndex={layerIndex}
+              layerCount={layerCount}
+              canMoveBackward={layerIndex > 1}
+              canMoveForward={layerIndex < layerCount}
+              onMoveBackward={() => onMoveBackward(layer.id)}
+              onMoveForward={() => onMoveForward(layer.id)}
+            />
+          )}
 
-          <button
-            className="resize-handle"
-            onMouseDown={startResize}
-            aria-label="Redimensionar"
-          />
+          {!isLocked && (
+            <button
+              className="resize-handle"
+              onMouseDown={startResize}
+              aria-label="Redimensionar"
+            />
+          )}
         </>
       )}
     </div>

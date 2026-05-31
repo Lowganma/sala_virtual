@@ -9,6 +9,7 @@ type FloatingWindowProps = {
   position: WindowPosition;
   size: WindowSize;
   isSelected: boolean;
+  isLocked: boolean;
   zIndex: number;
   layerIndex: number;
   layerCount: number;
@@ -16,7 +17,7 @@ type FloatingWindowProps = {
   canMoveForward: boolean;
   onMoveBackward: () => void;
   onMoveForward: () => void;
-  onSelect: () => void;
+  onSelect: (addToSelection: boolean) => void;
   onPositionChange: (nextPosition: WindowPosition) => void;
   onSizeChange: (nextSize: WindowSize) => void;
   children: ReactNode;
@@ -28,6 +29,7 @@ export function FloatingWindow({
   position,
   size,
   isSelected,
+  isLocked,
   zIndex,
   layerIndex,
   layerCount,
@@ -155,7 +157,9 @@ export function FloatingWindow({
 
   return (
     <section
-      className={`floating-window ${className} ${isSelected ? "selected" : ""}`}
+      className={`floating-window ${className} ${isSelected ? "selected" : ""} ${
+        isLocked ? "locked" : ""
+      }`}
       style={{
         left: localPosition.x,
         top: localPosition.y,
@@ -165,7 +169,7 @@ export function FloatingWindow({
       }}
       onMouseDown={(event) => {
         event.stopPropagation();
-        onSelect();
+        onSelect(event.shiftKey);
       }}
     >
       <header
@@ -173,7 +177,12 @@ export function FloatingWindow({
         onMouseDown={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          onSelect();
+          onSelect(event.shiftKey);
+
+          if (isLocked) {
+            return;
+          }
+
           setDragStart({
             mouseX: event.clientX,
             mouseY: event.clientY,
@@ -183,37 +192,42 @@ export function FloatingWindow({
         }}
       >
         <strong>{title}</strong>
-        {isSelected && (
-          <LayerControls
-            label="Ventana"
-            layerIndex={layerIndex}
-            layerCount={layerCount}
-            canMoveBackward={canMoveBackward}
-            canMoveForward={canMoveForward}
-            onMoveBackward={onMoveBackward}
-            onMoveForward={onMoveForward}
-          />
-        )}
+        {isSelected &&
+          (isLocked ? (
+            <span className="lock-badge">Bloqueado</span>
+          ) : (
+            <LayerControls
+              label="Ventana"
+              layerIndex={layerIndex}
+              layerCount={layerCount}
+              canMoveBackward={canMoveBackward}
+              canMoveForward={canMoveForward}
+              onMoveBackward={onMoveBackward}
+              onMoveForward={onMoveForward}
+            />
+          ))}
         <span>⋮</span>
       </header>
 
       <div className="floating-window-body">{children}</div>
 
-      <button
-        className="window-resize-handle"
-        aria-label="Redimensionar ventana"
-        onMouseDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onSelect();
-          setResizeStart({
-            mouseX: event.clientX,
-            mouseY: event.clientY,
-            width: localSize.width,
-            height: localSize.height,
-          });
-        }}
-      />
+      {!isLocked && (
+        <button
+          className="window-resize-handle"
+          aria-label="Redimensionar ventana"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onSelect(event.shiftKey);
+            setResizeStart({
+              mouseX: event.clientX,
+              mouseY: event.clientY,
+              width: localSize.width,
+              height: localSize.height,
+            });
+          }}
+        />
+      )}
     </section>
   );
 }
