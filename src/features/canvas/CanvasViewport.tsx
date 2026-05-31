@@ -11,9 +11,16 @@ const MAX_ZOOM = 3;
 type CanvasViewportProps = {
   activeTool: Tool;
   children?: ReactNode;
+  onPasteImage?: (payload: {
+    src: string;
+    type: "image" | "gif";
+    x: number;
+    y: number;
+  }) => void;
+  onCanvasMouseDown?: () => void;
 };
 
-export function CanvasViewport({ activeTool, children }: CanvasViewportProps) {
+export function CanvasViewport({ activeTool, children, onPasteImage, onCanvasMouseDown }: CanvasViewportProps) {
   const viewportRef = useRef<HTMLElement | null>(null);
 
   const panDragRef = useRef<{
@@ -97,6 +104,114 @@ export function CanvasViewport({ activeTool, children }: CanvasViewportProps) {
     };
   }, [viewportSize.width, viewportSize.height, zoomAtPoint]);
 
+useEffect(() => {
+  function isTypingInInput() {
+    const activeElement = document.activeElement;
+
+    return (
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      activeElement instanceof HTMLSelectElement ||
+      activeElement?.getAttribute("contenteditable") === "true"
+    );
+  }
+
+  function pasteAtViewportCenter(src: string, type: "image" | "gif") {
+    if (!viewportRef.current || !onPasteImage) {
+      return;
+    }
+
+    const centerX = viewportSize.width / 2;
+    const centerY = viewportSize.height / 2;
+
+    const worldX = (centerX - view.panX) / view.zoom;
+    const worldY = (centerY - view.panY) / view.zoom;
+
+    onPasteImage({
+      src,
+      type,
+      x: worldX,
+      y: worldY,
+    });
+  }
+
+function handlePaste(event: ClipboardEvent) {
+  if (isTypingInInput()) {
+    return;
+  }
+
+  const text = event.clipboardData?.getData("text/plain")?.trim();
+  const html = event.clipboardData?.getData("text/html");
+
+  const directImageUrlPattern = /\.(png|jpg|jpeg|webp|gif)(\?.*)?$/i;
+
+  if (text && directImageUrlPattern.test(text)) {
+    event.preventDefault();
+
+    pasteAtViewportCenter(
+      text,
+      /\.gif(\?.*)?$/i.test(text) ? "gif" : "image"
+    );
+
+    return;
+  }
+
+  if (html) {
+    const parser = new DOMParser();
+    const documentFromClipboard = parser.parseFromString(html, "text/html");
+    const imageElement = documentFromClipboard.querySelector("img");
+    const imageSrc = imageElement?.getAttribute("src") || "";
+
+    if (imageSrc && directImageUrlPattern.test(imageSrc)) {
+      event.preventDefault();
+
+      pasteAtViewportCenter(
+        imageSrc,
+        /\.gif(\?.*)?$/i.test(imageSrc) ? "gif" : "image"
+      );
+
+      return;
+    }
+  }
+
+  const clipboardItems = Array.from(event.clipboardData?.items || []);
+
+  const imageItem = clipboardItems.find((item) =>
+    item.type.startsWith("image/")
+  );
+
+  if (!imageItem) {
+    return;
+  }
+
+  const file = imageItem.getAsFile();
+
+  if (!file) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const src = URL.createObjectURL(file);
+  const type = file.type === "image/gif" ? "gif" : "image";
+
+  pasteAtViewportCenter(src, type);
+}
+
+  window.addEventListener("paste", handlePaste);
+
+  return () => {
+    window.removeEventListener("paste", handlePaste);
+  };
+}, [
+  onPasteImage,
+  view.panX,
+  view.panY,
+  view.zoom,
+  viewportSize.width,
+  viewportSize.height,
+]);
+
   return (
     <section
       ref={viewportRef}
@@ -156,6 +271,7 @@ export function CanvasViewport({ activeTool, children }: CanvasViewportProps) {
 
       <div
         className="design-surface"
+        onMouseDown={() => onCanvasMouseDown?.()}
         style={{
           width: WORLD_WIDTH,
           height: WORLD_HEIGHT,

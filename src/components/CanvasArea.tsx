@@ -3,8 +3,23 @@ import { CanvasViewport } from "../features/canvas/CanvasViewport";
 
 type CanvasAreaProps = {
   children?: ReactNode;
+  onPasteImage?: (payload: {
+    src: string;
+    type: "image" | "gif";
+    x: number;
+    y: number;
+  }) => void;
+  onCanvasMouseDown?: () => void;
 };
 
-export function CanvasArea({ children }: CanvasAreaProps) {
-  return <CanvasViewport activeTool="hand">{children}</CanvasViewport>;
+export function CanvasArea({ children, onPasteImage, onCanvasMouseDown }: CanvasAreaProps) {
+  return (
+    <CanvasViewport
+      activeTool="hand"
+      onPasteImage={onPasteImage}
+      onCanvasMouseDown={onCanvasMouseDown}
+    >
+      {children}
+    </CanvasViewport>
+  );
 }

@@ -7,6 +7,10 @@ import { MusicPanel } from "./MusicPanel";
 import { ChatPanel } from "./ChatPanel";
 import { FloatingWindow } from "./FloatingWindow";
 import { CanvasSidebar } from "./CanvasSidebar";
+import { useState, useEffect } from "react";
+import type { CanvasImageLayer as CanvasImageLayerType } from "../features/canvas/canvasTypes";
+import { CanvasImageLayer } from "../features/canvas/CanvasImageLayer";
+
 
 type RoomScreenProps = {
   room: Room;
@@ -25,6 +29,10 @@ type RoomScreenProps = {
   chatInput: string;
   sendingChatMessage: boolean;
   roomWindows: RoomWindow[];
+  onWindowSizeChange: (
+  windowKey: string,
+  nextSize: { width: number; height: number }
+) => void;
   onWindowPositionChange: (
   windowKey: string,
   nextPosition: { x: number; y: number }
@@ -64,6 +72,7 @@ export function RoomScreen({
   chatInput,
   sendingChatMessage,
   roomWindows,
+  onWindowSizeChange,
   onWindowPositionChange,
   onWindowMinimizedChange,
   onChatInputChange,
@@ -77,6 +86,12 @@ export function RoomScreen({
   onSyncToStart,
   onLeaveRoom,
 }: RoomScreenProps) {
+
+const [selectedWindowKey, setSelectedWindowKey] = useState<string | null>(null);
+const [canvasLayers, setCanvasLayers] = useState<CanvasImageLayerType[]>([]);
+const [selectedCanvasLayerId, setSelectedCanvasLayerId] = useState<string | null>(
+  null
+);
 
   function getWindowPosition(
   windowKey: string,
@@ -96,6 +111,24 @@ export function RoomScreen({
   };
 }
 
+  function getWindowSize(
+  windowKey: string,
+  fallback: { width: number; height: number }
+) {
+  const savedWindow = roomWindows.find(
+    (roomWindow) => roomWindow.window_key === windowKey
+  );
+
+  if (!savedWindow) {
+    return fallback;
+  }
+
+  return {
+    width: Number(savedWindow.width),
+    height: Number(savedWindow.height),
+  };
+}
+
   function getWindowIsMinimized(windowKey: string) {
   const savedWindow = roomWindows.find(
     (roomWindow) => roomWindow.window_key === windowKey
@@ -109,22 +142,139 @@ function toggleWindow(windowKey: string) {
   onWindowMinimizedChange(windowKey, !currentValue);
 }
 
+function handlePasteImage(payload: {
+  src: string;
+  type: "image" | "gif";
+  x: number;
+  y: number;
+}) {
+  const nextLayer: CanvasImageLayerType = {
+    id: crypto.randomUUID(),
+    type: payload.type,
+    src: payload.src,
+    x: payload.x - 160,
+    y: payload.y - 120,
+    w: 320,
+    h: 240,
+    z: canvasLayers.length + 30,
+  };
+
+  setCanvasLayers((currentLayers) => [...currentLayers, nextLayer]);
+  setSelectedCanvasLayerId(nextLayer.id);
+}
+
+function moveCanvasLayer(
+  id: string,
+  nextPosition: { x: number; y: number }
+) {
+  setCanvasLayers((currentLayers) =>
+    currentLayers.map((layer) =>
+      layer.id === id
+        ? {
+            ...layer,
+            x: nextPosition.x,
+            y: nextPosition.y,
+          }
+        : layer
+    )
+  );
+}
+
+function resizeCanvasLayer(id: string, nextSize: { w: number; h: number }) {
+  setCanvasLayers((currentLayers) =>
+    currentLayers.map((layer) =>
+      layer.id === id
+        ? {
+            ...layer,
+            w: nextSize.w,
+            h: nextSize.h,
+          }
+        : layer
+    )
+  );
+}
+
+  function deleteSelectedCanvasLayer() {
+  if (!selectedCanvasLayerId) {
+    return;
+  }
+
+  setCanvasLayers((currentLayers) =>
+    currentLayers.filter((layer) => layer.id !== selectedCanvasLayerId)
+  );
+
+  setSelectedCanvasLayerId(null);
+}
+
+useEffect(() => {
+  function isTypingInInput() {
+    const activeElement = document.activeElement;
+
+    return (
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      activeElement instanceof HTMLSelectElement ||
+      activeElement?.getAttribute("contenteditable") === "true"
+    );
+  }
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (isTypingInInput()) {
+      return;
+    }
+
+    if (event.key === "Delete" || event.key === "Backspace") {
+      if (!selectedCanvasLayerId) {
+        return;
+      }
+
+      event.preventDefault();
+      deleteSelectedCanvasLayer();
+    }
+  }
+
+  window.addEventListener("keydown", handleKeyDown);
+
+  return () => {
+    window.removeEventListener("keydown", handleKeyDown);
+  };
+}, [selectedCanvasLayerId]);
+
   return (
   <main className="room-layout">
-    <CanvasArea>
+    <CanvasArea onPasteImage={handlePasteImage}
+    onCanvasMouseDown={() => {
+      setSelectedCanvasLayerId(null);
+      setSelectedWindowKey(null);
+    }}>
+      {canvasLayers.map((layer) => (
+  <CanvasImageLayer
+    key={layer.id}
+    layer={layer}
+    isSelected={selectedCanvasLayerId === layer.id}
+    onSelect={setSelectedCanvasLayerId}
+    onMove={moveCanvasLayer}
+    onResize={resizeCanvasLayer}
+  />
+))}
+
       {!getWindowIsMinimized("room-info") && (
         <FloatingWindow
           title="Sala"
           className="room-info-window"
           position={getWindowPosition("room-info", { x: 120, y: 120 })}
+          size={getWindowSize("room-info", { width: 260, height: 180 })}
+          isSelected={selectedWindowKey === "room-info"}
+          onSelect={() => setSelectedWindowKey("room-info")}
           onPositionChange={(nextPosition) =>
             onWindowPositionChange("room-info", nextPosition)
           }
+          onSizeChange={(nextSize) => onWindowSizeChange("room-info", nextSize)}
         >
           <RoomInfoPanel room={room} username={username} />
 
-          <button className="secondary" onClick={onLeaveRoom}>
-            Salir de la sala
+          <button className="ghost-danger-button" onClick={onLeaveRoom}>
+            Salir
           </button>
         </FloatingWindow>
       )}
@@ -134,9 +284,13 @@ function toggleWindow(windowKey: string) {
           title="Música"
           className="music-window"
           position={getWindowPosition("music", { x: 440, y: 120 })}
+          size={getWindowSize("music", { width: 280, height: 520 })}
+          isSelected={selectedWindowKey === "music"}
+          onSelect={() => setSelectedWindowKey("music")}
           onPositionChange={(nextPosition) =>
             onWindowPositionChange("music", nextPosition)
           }
+          onSizeChange={(nextSize) => onWindowSizeChange("music", nextSize)}
         >
           <MusicPanel
             youtubePlayerRef={youtubePlayerRef}
@@ -161,9 +315,13 @@ function toggleWindow(windowKey: string) {
           title="Chat"
           className="chat-window"
           position={getWindowPosition("chat", { x: 820, y: 120 })}
+          size={getWindowSize("chat", { width: 280, height: 360 })}
+          isSelected={selectedWindowKey === "chat"}
+          onSelect={() => setSelectedWindowKey("chat")}
           onPositionChange={(nextPosition) =>
             onWindowPositionChange("chat", nextPosition)
           }
+          onSizeChange={(nextSize) => onWindowSizeChange("chat", nextSize)}
         >
           <ChatPanel
             chatMessages={chatMessages}

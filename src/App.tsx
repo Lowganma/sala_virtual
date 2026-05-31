@@ -584,6 +584,39 @@ function syncToStart() {
   );
 }
 
+  async function updateRoomWindowSize(
+  windowKey: string,
+  nextSize: { width: number; height: number }
+) {
+  if (!currentRoom) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("room_windows")
+    .update({
+      width: nextSize.width,
+      height: nextSize.height,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("room_id", currentRoom.id)
+    .eq("window_key", windowKey)
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error(error);
+    setMessage("No se pudo guardar el tamaño de la ventana.");
+    return;
+  }
+
+  setRoomWindows((currentWindows) =>
+    currentWindows.map((roomWindow) =>
+      roomWindow.id === data.id ? data : roomWindow
+    )
+  );
+}
+
   function leaveRoom() {
     setCurrentRoom(null);
     setCurrentRoomState(null);
@@ -614,6 +647,7 @@ function syncToStart() {
           savingYoutube={savingYoutube}
           syncingPlayback={syncingPlayback}
           youtubePlayerRef={youtubePlayerRef}
+          onWindowSizeChange={updateRoomWindowSize}
           onSharedMessageChange={setSharedMessage}
           onYoutubeUrlChange={setYoutubeUrl}
           onSaveMessage={saveSharedMessage}

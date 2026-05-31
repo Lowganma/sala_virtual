@@ -34,24 +34,26 @@ export function MusicPanel({
   onSyncToStart,
 }: MusicPanelProps) {
   return (
-    <>
+    <div className="music-panel">
+      <div className="music-url-row">
+        <input
+          value={youtubeUrl}
+          onChange={(event) => onYoutubeUrlChange(event.target.value)}
+          placeholder="URL de YouTube..."
+          disabled={!canUseRoomState}
+        />
 
-      <label>Música de YouTube</label>
+        <button
+          className="compact-button"
+          onClick={onSaveYoutubeUrl}
+          disabled={savingYoutube || !canUseRoomState}
+          title="Guardar música"
+        >
+          💾
+        </button>
+      </div>
 
-      <input
-        value={youtubeUrl}
-        onChange={(event) => onYoutubeUrlChange(event.target.value)}
-        placeholder="Pega un enlace de YouTube..."
-        disabled={!canUseRoomState}
-      />
-
-      <button onClick={onSaveYoutubeUrl} disabled={savingYoutube || !canUseRoomState}>
-        {savingYoutube ? "Guardando música..." : "Guardar música"}
-      </button>
-
-      <div className="shared-box">
-        <p className="preview-title">Video compartido:</p>
-
+      <div className="music-video-shell">
         <YouTubePlayer
           ref={youtubePlayerRef}
           youtubeUrl={youtubeUrl}
@@ -59,21 +61,36 @@ export function MusicPanel({
           playbackSeconds={playbackSeconds}
           playbackUpdatedAt={playbackUpdatedAt}
         />
-
-        <div className="player-controls">
-          <button onClick={onPlayForEveryone} disabled={syncingPlayback || !canUseRoomState}>
-            Reproducir para todos
-          </button>
-
-          <button onClick={onPauseForEveryone} disabled={syncingPlayback || !canUseRoomState}>
-            Pausar para todos
-          </button>
-
-          <button onClick={onSyncToStart} disabled={syncingPlayback || !canUseRoomState}>
-            Reiniciar para todos
-          </button>
-        </div>
       </div>
-    </>
+
+      <div className="media-controls-row">
+        <button
+          className="media-button"
+          onClick={onPlayForEveryone}
+          disabled={syncingPlayback || !canUseRoomState}
+          title="Reproducir"
+        >
+          ▶
+        </button>
+
+        <button
+          className="media-button"
+          onClick={onPauseForEveryone}
+          disabled={syncingPlayback || !canUseRoomState}
+          title="Pausar"
+        >
+          ⏸
+        </button>
+
+        <button
+          className="media-button"
+          onClick={onSyncToStart}
+          disabled={syncingPlayback || !canUseRoomState}
+          title="Reiniciar"
+        >
+          ⏮
+        </button>
+      </div>
+    </div>
   );
 }

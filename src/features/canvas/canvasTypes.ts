@@ -12,3 +12,14 @@ export type CanvasDocument = {
   worldHeight: number;
   wallColor: string;
 };
+
+export type CanvasImageLayer = {
+  id: string;
+  type: "image" | "gif";
+  src: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  z: number;
+};
