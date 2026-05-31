@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type {
   CanvasStroke,
   DrawingLayerType,
-  DrawingSettings,
+  DrawingStrokeDraft,
   StrokePoint,
 } from "./drawingTypes";
 
@@ -11,54 +11,54 @@ type DrawingCanvasProps = {
   width: number;
   height: number;
   strokes: CanvasStroke[];
-  previewStroke: StrokePoint[] | null;
-  settings: DrawingSettings;
+  previewStroke: DrawingStrokeDraft | null;
   className?: string;
 };
 
-type DrawableStroke = Pick<
-  CanvasStroke,
-  | "tool"
-  | "color"
-  | "size"
-  | "opacity"
-  | "brush_intensity"
-  | "brush_softness"
-  | "brush_smoothing"
-  | "points"
-  | "layer_type"
->;
+type DrawableStroke = CanvasStroke | DrawingStrokeDraft;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function drawStrokePath(context: CanvasRenderingContext2D, stroke: DrawableStroke) {
-  const [firstPoint, secondPoint] = stroke.points;
+function drawRoundDot(context: CanvasRenderingContext2D, point: StrokePoint, size: number) {
+  context.beginPath();
+  context.arc(point.x, point.y, Math.max(1, size) / 2, 0, Math.PI * 2);
+  context.fill();
+}
+
+function drawPencilStroke(context: CanvasRenderingContext2D, stroke: DrawableStroke) {
+  const [firstPoint] = stroke.points;
+
+  if (!firstPoint) {
+    return;
+  }
+
+  context.save();
+  context.globalCompositeOperation = "source-over";
+  context.strokeStyle = stroke.color;
+  context.fillStyle = stroke.color;
+  context.lineWidth = Math.max(1, stroke.size);
+  context.globalAlpha = clamp(stroke.opacity ?? 1, 0, 1);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  if (stroke.points.length === 1) {
+    drawRoundDot(context, firstPoint, stroke.size);
+    context.restore();
+    return;
+  }
 
   context.beginPath();
   context.moveTo(firstPoint.x, firstPoint.y);
 
-  if (stroke.tool !== "brush" || stroke.brush_smoothing <= 0 || !secondPoint) {
-    for (const point of stroke.points.slice(1)) {
-      context.lineTo(point.x, point.y);
-    }
-
-    return;
-  }
-
-  const smoothing = clamp(stroke.brush_smoothing, 0, 1);
-
   for (let index = 1; index < stroke.points.length - 1; index += 1) {
-    const previousPoint = stroke.points[index - 1];
-    const currentPoint = stroke.points[index];
-    const nextPoint = stroke.points[index + 1];
-    const controlX = currentPoint.x * smoothing + previousPoint.x * (1 - smoothing);
-    const controlY = currentPoint.y * smoothing + previousPoint.y * (1 - smoothing);
-    const midX = (currentPoint.x + nextPoint.x) / 2;
-    const midY = (currentPoint.y + nextPoint.y) / 2;
+    const current = stroke.points[index];
+    const next = stroke.points[index + 1];
+    const midX = (current.x + next.x) / 2;
+    const midY = (current.y + next.y) / 2;
 
-    context.quadraticCurveTo(controlX, controlY, midX, midY);
+    context.quadraticCurveTo(current.x, current.y, midX, midY);
   }
 
   const lastPoint = stroke.points.at(-1);
@@ -66,40 +66,113 @@ function drawStrokePath(context: CanvasRenderingContext2D, stroke: DrawableStrok
   if (lastPoint) {
     context.lineTo(lastPoint.x, lastPoint.y);
   }
+
+  context.stroke();
+  context.restore();
 }
 
-function drawStroke(context: CanvasRenderingContext2D, stroke: DrawableStroke) {
-  if (stroke.points.length < 2) {
+function drawBrushStroke(context: CanvasRenderingContext2D, stroke: DrawableStroke) {
+  const [firstPoint] = stroke.points;
+
+  if (!firstPoint) {
+    return;
+  }
+
+  const size = Math.max(1, stroke.size);
+  const taper = clamp(stroke.brush_softness ?? 0.35, 0, 1);
+  const flow = clamp(stroke.brush_intensity ?? 0.6, 0, 1);
+  const opacity = clamp(stroke.opacity ?? 0.7, 0, 1);
+
+  context.save();
+  context.globalCompositeOperation = "source-over";
+  context.strokeStyle = stroke.color;
+  context.fillStyle = stroke.color;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  if (stroke.points.length === 1) {
+    context.globalAlpha = opacity * flow;
+    drawRoundDot(context, firstPoint, size * (1 - taper * 0.5));
+    context.restore();
+    return;
+  }
+
+  const total = stroke.points.length - 1;
+
+  for (let index = 1; index < stroke.points.length; index += 1) {
+    const previousPoint = stroke.points[index - 1];
+    const nextPoint = stroke.points[index];
+    const progress = total <= 0 ? 1 : index / total;
+    const edge = Math.min(progress, 1 - progress) * 2;
+    const taperFactor = 1 - taper * (1 - edge);
+
+    context.lineWidth = Math.max(1, size * taperFactor);
+    context.globalAlpha = opacity * flow;
+    context.beginPath();
+    context.moveTo(previousPoint.x, previousPoint.y);
+    context.lineTo(nextPoint.x, nextPoint.y);
+    context.stroke();
+  }
+
+  context.restore();
+}
+
+function drawEraserStroke(context: CanvasRenderingContext2D, stroke: DrawableStroke) {
+  const [firstPoint] = stroke.points;
+
+  if (!firstPoint) {
     return;
   }
 
   context.save();
+  context.globalCompositeOperation = "destination-out";
+  context.lineWidth = Math.max(8, stroke.size);
+  context.globalAlpha = 1;
   context.lineCap = "round";
   context.lineJoin = "round";
-  context.lineWidth = stroke.size;
+  context.strokeStyle = "rgba(0, 0, 0, 1)";
+  context.fillStyle = "rgba(0, 0, 0, 1)";
 
-  if (stroke.tool === "eraser") {
-    // El borrador es un trazo negativo y solo afecta al canvas de esta capa.
-    context.globalCompositeOperation = "destination-out";
-    context.globalAlpha = 1;
-    context.strokeStyle = "rgba(0, 0, 0, 1)";
-  } else {
-    context.globalCompositeOperation = "source-over";
-    context.globalAlpha =
-      stroke.tool === "brush"
-        ? clamp(stroke.opacity * stroke.brush_intensity, 0.05, 1)
-        : 1;
-    context.strokeStyle = stroke.color;
-
-    if (stroke.tool === "brush" && stroke.brush_softness > 0) {
-      context.shadowBlur = stroke.size * stroke.brush_softness;
-      context.shadowColor = stroke.color;
-    }
+  if (stroke.points.length === 1) {
+    drawRoundDot(context, firstPoint, Math.max(8, stroke.size));
+    context.restore();
+    return;
   }
 
-  drawStrokePath(context, stroke);
+  context.beginPath();
+  context.moveTo(firstPoint.x, firstPoint.y);
+
+  for (let index = 1; index < stroke.points.length - 1; index += 1) {
+    const current = stroke.points[index];
+    const next = stroke.points[index + 1];
+    const midX = (current.x + next.x) / 2;
+    const midY = (current.y + next.y) / 2;
+
+    context.quadraticCurveTo(current.x, current.y, midX, midY);
+  }
+
+  const lastPoint = stroke.points.at(-1);
+
+  if (lastPoint) {
+    context.lineTo(lastPoint.x, lastPoint.y);
+  }
+
   context.stroke();
   context.restore();
+}
+
+function drawStroke(context: CanvasRenderingContext2D, stroke: DrawableStroke) {
+  if (stroke.tool === "brush") {
+    drawBrushStroke(context, stroke);
+    return;
+  }
+
+  if (stroke.tool === "eraser") {
+    drawEraserStroke(context, stroke);
+    return;
+  }
+
+  drawPencilStroke(context, stroke);
 }
 
 export function DrawingCanvas({
@@ -108,7 +181,6 @@ export function DrawingCanvas({
   height,
   strokes,
   previewStroke,
-  settings,
   className,
 }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -132,31 +204,15 @@ export function DrawingCanvas({
 
     context.clearRect(0, 0, width, height);
 
-    // Renderiza de nuevo todos los trazos persistidos para reconstruir la capa.
+    // Renderiza siempre desde datos persistidos para reconstruir la capa en orden.
     for (const stroke of layerStrokes) {
       drawStroke(context, stroke);
     }
 
-    if (
-      previewStroke &&
-      settings.tool !== "pan" &&
-      settings.layerType === layerType
-    ) {
-      const isBrush = settings.tool === "brush";
-
-      drawStroke(context, {
-        layer_type: layerType,
-        tool: settings.tool,
-        color: settings.color,
-        size: settings.size,
-        opacity: settings.tool === "pencil" ? 1 : settings.opacity,
-        brush_intensity: isBrush ? settings.brushIntensity : 1,
-        brush_softness: isBrush ? settings.brushSoftness : 0,
-        brush_smoothing: isBrush ? settings.brushSmoothing : 0,
-        points: previewStroke,
-      });
+    if (previewStroke?.layer_type === layerType) {
+      drawStroke(context, previewStroke);
     }
-  }, [height, layerStrokes, layerType, previewStroke, settings, width]);
+  }, [height, layerStrokes, layerType, previewStroke, width]);
 
   return (
     <canvas

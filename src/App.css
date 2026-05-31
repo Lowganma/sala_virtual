@@ -146,34 +146,6 @@ hr {
   color: #cbd5e1;
 }
 
-.viewport-tools {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 220;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid #334155;
-  border-radius: 14px;
-  padding: 8px;
-  backdrop-filter: blur(10px);
-}
-
-.viewport-tools button {
-  width: auto;
-  margin: 0;
-  padding: 8px 12px;
-}
-
-.viewport-tools span {
-  color: #f8fafc;
-  font-weight: 800;
-  min-width: 52px;
-  text-align: center;
-}
-
 .canvas-sidebar {
   position: absolute;
   right: 16px;
@@ -207,6 +179,31 @@ hr {
   margin: 0 0 10px;
   color: #e2e8f0;
   font-weight: 800;
+}
+
+.canvas-zoom-controls {
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  gap: 8px;
+  align-items: center;
+}
+
+.canvas-zoom-controls button {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.canvas-zoom-controls button:last-child {
+  grid-column: 1 / -1;
+}
+
+.canvas-zoom-controls span {
+  color: #f8fafc;
+  font-weight: 800;
+  text-align: center;
 }
 
 .module-button {
@@ -636,11 +633,13 @@ hr {
   position: absolute;
   top: 16px;
   left: 16px;
+  right: 224px;
   z-index: 220;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  max-width: calc(100% - 320px);
+  box-sizing: border-box;
   padding: 8px;
   border: 1px solid #334155;
   border-radius: 16px;
@@ -731,11 +730,11 @@ hr {
 }
 
 .background-drawing-canvas {
-  z-index: 0;
+  z-index: 1;
 }
 
 .canvas-world-grid {
-  z-index: 1;
+  z-index: 0;
   pointer-events: none;
 }
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { CanvasViewport } from "../features/canvas/CanvasViewport";
+import type { CanvasViewportControls } from "../features/canvas/CanvasViewport";
 
 type CanvasAreaProps = {
   roomId: string;
@@ -12,6 +13,7 @@ type CanvasAreaProps = {
     file?: File;
   }) => void;
   onCanvasMouseDown?: () => void;
+  onViewportControlsChange?: (controls: CanvasViewportControls | null) => void;
 };
 
 export function CanvasArea({
@@ -19,12 +21,14 @@ export function CanvasArea({
   children,
   onPasteImage,
   onCanvasMouseDown,
+  onViewportControlsChange,
 }: CanvasAreaProps) {
   return (
     <CanvasViewport
       roomId={roomId}
       onPasteImage={onPasteImage}
       onCanvasMouseDown={onCanvasMouseDown}
+      onViewportControlsChange={onViewportControlsChange}
     >
       {children}
     </CanvasViewport>
