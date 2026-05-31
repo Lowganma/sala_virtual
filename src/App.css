@@ -164,6 +164,10 @@ hr {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
 }
 
+.canvas-sidebar.is-collapsed {
+  width: 44px;
+}
+
 .canvas-sidebar-menu {
   margin-top: 10px;
   width: 180px;
@@ -629,12 +633,17 @@ hr {
   margin-left: 8px;
 }
 
-.drawing-toolbar {
+.drawing-toolbar,
+.drawing-toolbar-toggle {
   position: absolute;
   top: 16px;
   left: 16px;
-  right: 224px;
   z-index: 220;
+}
+
+.drawing-toolbar {
+  position: absolute;
+  right: 224px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -648,9 +657,32 @@ hr {
   backdrop-filter: blur(10px);
 }
 
+.drawing-toolbar-toggle {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.25);
+  font-size: 13px;
+  backdrop-filter: blur(10px);
+}
+
+.drawing-toolbar-toggle:hover {
+  background: rgba(30, 41, 59, 0.95);
+}
+
 .drawing-tool-buttons {
   display: inline-flex;
   gap: 4px;
+}
+
+.drawing-toolbar-collapse-button {
+  background: rgba(71, 85, 105, 0.85);
+  color: #f8fafc;
 }
 
 .drawing-toolbar button,

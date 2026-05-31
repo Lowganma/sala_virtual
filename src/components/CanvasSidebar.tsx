@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CanvasViewportControls } from "../features/canvas/CanvasViewport";
 
 type CanvasSidebarItem = {
@@ -17,56 +18,75 @@ export function CanvasSidebar({
   viewportControls,
   onToggleItem,
 }: CanvasSidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
-    <aside className="canvas-sidebar">
-      <button className="canvas-sidebar-main-button">☰</button>
+    <aside
+      className={isCollapsed ? "canvas-sidebar is-collapsed" : "canvas-sidebar"}
+    >
+      <button
+        type="button"
+        className="canvas-sidebar-main-button"
+        onClick={() => setIsCollapsed((currentValue) => !currentValue)}
+        aria-expanded={!isCollapsed}
+        aria-label={isCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
+        title={isCollapsed ? "Mostrar menú lateral" : "Ocultar menú lateral"}
+      >
+        ☰
+      </button>
 
-      <div className="canvas-sidebar-menu">
-        <p className="canvas-sidebar-title">Vista</p>
+      {!isCollapsed && (
+        <div className="canvas-sidebar-menu">
+          <p className="canvas-sidebar-title">Vista</p>
 
-        {viewportControls && (
-          <div className="canvas-zoom-controls" aria-label="Zoom del canvas">
-            <button type="button" onClick={viewportControls.zoomOut}>
-              −
+          {viewportControls && (
+            <div className="canvas-zoom-controls" aria-label="Zoom del canvas">
+              <button type="button" onClick={viewportControls.zoomOut}>
+                −
+              </button>
+              <span>{Math.round(viewportControls.zoom * 100)}%</span>
+              <button type="button" onClick={viewportControls.zoomIn}>
+                +
+              </button>
+              <button type="button" onClick={viewportControls.resetView}>
+                Reset
+              </button>
+            </div>
+          )}
+
+          <hr />
+
+          <p className="canvas-sidebar-title">Módulos</p>
+
+          {items.map((item) => (
+            <button
+              key={item.key}
+              className={
+                item.isMinimized ? "module-button minimized" : "module-button"
+              }
+              onClick={() => onToggleItem(item.key)}
+            >
+              {item.isMinimized
+                ? `Mostrar ${item.label}`
+                : `Ocultar ${item.label}`}
             </button>
-            <span>{Math.round(viewportControls.zoom * 100)}%</span>
-            <button type="button" onClick={viewportControls.zoomIn}>
-              +
-            </button>
-            <button type="button" onClick={viewportControls.resetView}>
-              Reset
-            </button>
-          </div>
-        )}
+          ))}
 
-        <hr />
+          <hr />
 
-        <p className="canvas-sidebar-title">Módulos</p>
-
-        {items.map((item) => (
-          <button
-            key={item.key}
-            className={item.isMinimized ? "module-button minimized" : "module-button"}
-            onClick={() => onToggleItem(item.key)}
-          >
-            {item.isMinimized ? `Mostrar ${item.label}` : `Ocultar ${item.label}`}
+          <button type="button" className="module-button" disabled>
+            + Imagen
           </button>
-        ))}
 
-        <hr />
+          <button type="button" className="module-button" disabled>
+            + GIF
+          </button>
 
-        <button className="module-button" disabled>
-          + Imagen
-        </button>
-
-        <button className="module-button" disabled>
-          + GIF
-        </button>
-
-        <button className="module-button" disabled>
-          + Texto
-        </button>
-      </div>
+          <button type="button" className="module-button" disabled>
+            + Texto
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
