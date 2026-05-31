@@ -6,6 +6,7 @@ import { RoomInfoPanel } from "./RoomInfoPanel";
 import { MusicPanel } from "./MusicPanel";
 import { ChatPanel } from "./ChatPanel";
 import { FloatingWindow } from "./FloatingWindow";
+import { CanvasSidebar } from "./CanvasSidebar";
 
 type RoomScreenProps = {
   room: Room;
@@ -27,6 +28,10 @@ type RoomScreenProps = {
   onWindowPositionChange: (
   windowKey: string,
   nextPosition: { x: number; y: number }
+) => void;
+  onWindowMinimizedChange: (
+  windowKey: string,
+  nextIsMinimized: boolean
 ) => void;
   onChatInputChange: (value: string) => void;
   onSendChatMessage: () => void;
@@ -60,6 +65,7 @@ export function RoomScreen({
   sendingChatMessage,
   roomWindows,
   onWindowPositionChange,
+  onWindowMinimizedChange,
   onChatInputChange,
   onSendChatMessage,
   onSharedMessageChange,
@@ -90,66 +96,106 @@ export function RoomScreen({
   };
 }
 
+  function getWindowIsMinimized(windowKey: string) {
+  const savedWindow = roomWindows.find(
+    (roomWindow) => roomWindow.window_key === windowKey
+  );
+
+  return Boolean(savedWindow?.is_minimized);
+}
+
+function toggleWindow(windowKey: string) {
+  const currentValue = getWindowIsMinimized(windowKey);
+  onWindowMinimizedChange(windowKey, !currentValue);
+}
+
   return (
   <main className="room-layout">
-    <CanvasArea />
+    <CanvasArea>
+      {!getWindowIsMinimized("room-info") && (
+        <FloatingWindow
+          title="Sala"
+          className="room-info-window"
+          position={getWindowPosition("room-info", { x: 120, y: 120 })}
+          onPositionChange={(nextPosition) =>
+            onWindowPositionChange("room-info", nextPosition)
+          }
+        >
+          <RoomInfoPanel room={room} username={username} />
 
-    <FloatingWindow
-  title="Sala"
-  className="room-info-window"
-  position={getWindowPosition("room-info", { x: 24, y: 24 })}
-  onPositionChange={(nextPosition) =>
-    onWindowPositionChange("room-info", nextPosition)
-  }
->
-      <RoomInfoPanel room={room} username={username} />
+          <button className="secondary" onClick={onLeaveRoom}>
+            Salir de la sala
+          </button>
+        </FloatingWindow>
+      )}
 
-      <button className="secondary" onClick={onLeaveRoom}>
-        Salir de la sala
-      </button>
-    </FloatingWindow>
+      {!getWindowIsMinimized("music") && (
+        <FloatingWindow
+          title="Música"
+          className="music-window"
+          position={getWindowPosition("music", { x: 440, y: 120 })}
+          onPositionChange={(nextPosition) =>
+            onWindowPositionChange("music", nextPosition)
+          }
+        >
+          <MusicPanel
+            youtubePlayerRef={youtubePlayerRef}
+            youtubeUrl={youtubeUrl}
+            isPlaying={isPlaying}
+            playbackSeconds={playbackSeconds}
+            playbackUpdatedAt={playbackUpdatedAt}
+            savingYoutube={savingYoutube}
+            syncingPlayback={syncingPlayback}
+            canUseRoomState={Boolean(roomState)}
+            onYoutubeUrlChange={onYoutubeUrlChange}
+            onSaveYoutubeUrl={onSaveYoutubeUrl}
+            onPlayForEveryone={onPlayForEveryone}
+            onPauseForEveryone={onPauseForEveryone}
+            onSyncToStart={onSyncToStart}
+          />
+        </FloatingWindow>
+      )}
 
-   <FloatingWindow
-  title="Música"
-  className="music-window"
-  position={getWindowPosition("music", { x: 24, y: 190 })}
-  onPositionChange={(nextPosition) =>
-    onWindowPositionChange("music", nextPosition)
-  }
->
-      <MusicPanel
-        youtubePlayerRef={youtubePlayerRef}
-        youtubeUrl={youtubeUrl}
-        isPlaying={isPlaying}
-        playbackSeconds={playbackSeconds}
-        playbackUpdatedAt={playbackUpdatedAt}
-        savingYoutube={savingYoutube}
-        syncingPlayback={syncingPlayback}
-        canUseRoomState={Boolean(roomState)}
-        onYoutubeUrlChange={onYoutubeUrlChange}
-        onSaveYoutubeUrl={onSaveYoutubeUrl}
-        onPlayForEveryone={onPlayForEveryone}
-        onPauseForEveryone={onPauseForEveryone}
-        onSyncToStart={onSyncToStart}
-      />
-    </FloatingWindow>
+      {!getWindowIsMinimized("chat") && (
+        <FloatingWindow
+          title="Chat"
+          className="chat-window"
+          position={getWindowPosition("chat", { x: 820, y: 120 })}
+          onPositionChange={(nextPosition) =>
+            onWindowPositionChange("chat", nextPosition)
+          }
+        >
+          <ChatPanel
+            chatMessages={chatMessages}
+            chatInput={chatInput}
+            sendingChatMessage={sendingChatMessage}
+            onChatInputChange={onChatInputChange}
+            onSendChatMessage={onSendChatMessage}
+          />
+        </FloatingWindow>
+      )}
+    </CanvasArea>
 
-   <FloatingWindow
-  title="Chat"
-  className="chat-window"
-  position={getWindowPosition("chat", { x: 390, y: 24 })}
-  onPositionChange={(nextPosition) =>
-    onWindowPositionChange("chat", nextPosition)
-  }
->
-      <ChatPanel
-        chatMessages={chatMessages}
-        chatInput={chatInput}
-        sendingChatMessage={sendingChatMessage}
-        onChatInputChange={onChatInputChange}
-        onSendChatMessage={onSendChatMessage}
-      />
-    </FloatingWindow>
+    <CanvasSidebar
+      items={[
+        {
+          key: "room-info",
+          label: "Sala",
+          isMinimized: getWindowIsMinimized("room-info"),
+        },
+        {
+          key: "music",
+          label: "Música",
+          isMinimized: getWindowIsMinimized("music"),
+        },
+        {
+          key: "chat",
+          label: "Chat",
+          isMinimized: getWindowIsMinimized("chat"),
+        },
+      ]}
+      onToggleItem={toggleWindow}
+    />
   </main>
 );
 }

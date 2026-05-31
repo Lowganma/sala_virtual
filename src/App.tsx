@@ -215,13 +215,14 @@ function App() {
   }
 
   const windowsToInsert = DEFAULT_WINDOWS.map((windowConfig) => ({
-    room_id: roomId,
-    window_key: windowConfig.window_key,
-    x: windowConfig.x,
-    y: windowConfig.y,
-    width: windowConfig.width,
-    height: windowConfig.height,
-  }));
+  room_id: roomId,
+  window_key: windowConfig.window_key,
+  x: windowConfig.x,
+  y: windowConfig.y,
+  width: windowConfig.width,
+  height: windowConfig.height,
+  is_minimized: windowConfig.is_minimized,
+}));
 
   const { data: createdWindows, error: insertError } = await supabase
     .from("room_windows")
@@ -293,10 +294,31 @@ function App() {
   }
 
     const DEFAULT_WINDOWS = [
-      { window_key: "room-info", x: 24, y: 24, width: 280, height: 220 },
-      { window_key: "music", x: 24, y: 190, width: 340, height: 520 },
-      { window_key: "chat", x: 390, y: 24, width: 340, height: 360 },
-    ];
+  {
+    window_key: "room-info",
+    x: 120,
+    y: 120,
+    width: 280,
+    height: 220,
+    is_minimized: false,
+  },
+  {
+    window_key: "music",
+    x: 440,
+    y: 120,
+    width: 340,
+    height: 520,
+    is_minimized: false,
+  },
+  {
+    window_key: "chat",
+    x: 820,
+    y: 120,
+    width: 340,
+    height: 360,
+    is_minimized: false,
+  },
+];
 
   async function joinRoom() {
     setLoading(true);
@@ -530,6 +552,38 @@ function syncToStart() {
   );
 }
 
+  async function updateRoomWindowMinimized(
+  windowKey: string,
+  nextIsMinimized: boolean
+) {
+  if (!currentRoom) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("room_windows")
+    .update({
+      is_minimized: nextIsMinimized,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("room_id", currentRoom.id)
+    .eq("window_key", windowKey)
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error(error);
+    setMessage("No se pudo actualizar el estado de la ventana.");
+    return;
+  }
+
+  setRoomWindows((currentWindows) =>
+    currentWindows.map((roomWindow) =>
+      roomWindow.id === data.id ? data : roomWindow
+    )
+  );
+}
+
   function leaveRoom() {
     setCurrentRoom(null);
     setCurrentRoomState(null);
@@ -574,6 +628,7 @@ function syncToStart() {
           onSyncToStart={syncToStart}
           roomWindows={roomWindows}
           onWindowPositionChange={updateRoomWindowPosition}
+          onWindowMinimizedChange={updateRoomWindowMinimized}
           onLeaveRoom={leaveRoom}
         />
       ) : (

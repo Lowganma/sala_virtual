@@ -31,5 +31,6 @@ export type RoomWindow = {
   y: number;
   width: number;
   height: number;
+  is_minimized: boolean;
   updated_at: string;
 };

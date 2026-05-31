@@ -37,36 +37,58 @@ export function FloatingWindow({
     setLocalPosition(position);
   }, [position, dragStart]);
 
+  useEffect(() => {
+  if (!dragStart) {
+    return;
+  }
+
+  let latestPosition = {
+    x: dragStart.windowX,
+    y: dragStart.windowY,
+  };
+
+  function handleWindowMouseMove(event: MouseEvent) {
+    event.preventDefault();
+
+    const deltaX = event.clientX - dragStart.mouseX;
+    const deltaY = event.clientY - dragStart.mouseY;
+
+    latestPosition = {
+      x: dragStart.windowX + deltaX,
+      y: dragStart.windowY + deltaY,
+    };
+
+    setLocalPosition(latestPosition);
+  }
+
+  function handleWindowMouseUp() {
+    setDragStart(null);
+    onPositionChange(latestPosition);
+    document.body.classList.remove("is-dragging-window");
+  }
+
+  document.body.classList.add("is-dragging-window");
+
+  window.addEventListener("mousemove", handleWindowMouseMove);
+  window.addEventListener("mouseup", handleWindowMouseUp);
+
+  return () => {
+    window.removeEventListener("mousemove", handleWindowMouseMove);
+    window.removeEventListener("mouseup", handleWindowMouseUp);
+    document.body.classList.remove("is-dragging-window");
+  };
+}, [dragStart, onPositionChange]);
+
   function handleMouseDown(event: React.MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
     setDragStart({
       mouseX: event.clientX,
       mouseY: event.clientY,
       windowX: localPosition.x,
       windowY: localPosition.y,
     });
-  }
-
-  function handleMouseMove(event: React.MouseEvent<HTMLElement>) {
-    if (!dragStart) {
-      return;
-    }
-
-    const deltaX = event.clientX - dragStart.mouseX;
-    const deltaY = event.clientY - dragStart.mouseY;
-
-    setLocalPosition({
-      x: dragStart.windowX + deltaX,
-      y: dragStart.windowY + deltaY,
-    });
-  }
-
-  function finishDrag() {
-    if (!dragStart) {
-      return;
-    }
-
-    setDragStart(null);
-    onPositionChange(localPosition);
   }
 
   return (
@@ -76,14 +98,9 @@ export function FloatingWindow({
         left: localPosition.x,
         top: localPosition.y,
       }}
-      onMouseMove={handleMouseMove}
-      onMouseUp={finishDrag}
-      onMouseLeave={finishDrag}
+      onMouseDown={(event) => event.stopPropagation()}
     >
-      <header
-        className="floating-window-header"
-        onMouseDown={handleMouseDown}
-      >
+      <header className="floating-window-header" onMouseDown={handleMouseDown}>
         <span>{title}</span>
       </header>
 
