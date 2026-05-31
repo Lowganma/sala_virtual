@@ -307,6 +307,7 @@ export function RoomScreen({
   return (
     <main className="room-layout">
       <CanvasArea
+        roomId={room.id}
         onPasteImage={handlePasteImage}
         onCanvasMouseDown={() => {
           setSelectedCanvasLayerId(null);

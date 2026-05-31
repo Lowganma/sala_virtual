@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { CanvasViewport } from "../features/canvas/CanvasViewport";
 
 type CanvasAreaProps = {
+  roomId: string;
   children?: ReactNode;
   onPasteImage?: (payload: {
     src: string;
@@ -14,13 +15,14 @@ type CanvasAreaProps = {
 };
 
 export function CanvasArea({
+  roomId,
   children,
   onPasteImage,
   onCanvasMouseDown,
 }: CanvasAreaProps) {
   return (
     <CanvasViewport
-      activeTool="hand"
+      roomId={roomId}
       onPasteImage={onPasteImage}
       onCanvasMouseDown={onCanvasMouseDown}
     >
