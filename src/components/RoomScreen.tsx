@@ -1,7 +1,9 @@
 import type { RefObject } from "react";
-import type { Room,RoomMessage, RoomState } from "../types/room";
-import { YouTubePlayer } from "./YouTubePlayer";
+import type { Room, RoomMessage, RoomState } from "../types/room";
 import type { YouTubePlayerHandle } from "./YouTubePlayer";
+import { CanvasArea } from "./CanvasArea";
+import { MusicPanel } from "./MusicPanel";
+import { ChatPanel } from "./ChatPanel";
 
 type RoomScreenProps = {
   room: Room;
@@ -61,7 +63,11 @@ export function RoomScreen({
 }: RoomScreenProps) {
 
   return (
-    <section className="card">
+    <main className="room-layout">
+    <CanvasArea />
+
+    <aside className="room-sidebar">
+      <section className="card">
       <h1>Sala: {room.code}</h1>
 
       <p>
@@ -94,94 +100,37 @@ export function RoomScreen({
         <p>{sharedMessage || "Todavía no hay mensaje compartido."}</p>
       </div>
 
-      <hr />
+      
 
-      <label>Música de YouTube</label>
+      <MusicPanel
+  youtubePlayerRef={youtubePlayerRef}
+  youtubeUrl={youtubeUrl}
+  isPlaying={isPlaying}
+  playbackSeconds={playbackSeconds}
+  playbackUpdatedAt={playbackUpdatedAt}
+  savingYoutube={savingYoutube}
+  syncingPlayback={syncingPlayback}
+  canUseRoomState={Boolean(roomState)}
+  onYoutubeUrlChange={onYoutubeUrlChange}
+  onSaveYoutubeUrl={onSaveYoutubeUrl}
+  onPlayForEveryone={onPlayForEveryone}
+  onPauseForEveryone={onPauseForEveryone}
+  onSyncToStart={onSyncToStart}
+/>
 
-      <input
-        value={youtubeUrl}
-        onChange={(event) => onYoutubeUrlChange(event.target.value)}
-        placeholder="Pega un enlace de YouTube..."
-        disabled={!roomState}
+            <ChatPanel
+        chatMessages={chatMessages}
+        chatInput={chatInput}
+        sendingChatMessage={sendingChatMessage}
+        onChatInputChange={onChatInputChange}
+        onSendChatMessage={onSendChatMessage}
       />
 
-      <button onClick={onSaveYoutubeUrl} disabled={savingYoutube || !roomState}>
-        {savingYoutube ? "Guardando música..." : "Guardar música"}
-      </button>
-
-      <div className="shared-box">
-        <p className="preview-title">Video compartido:</p>
-
-        <YouTubePlayer
-          ref={youtubePlayerRef}
-          youtubeUrl={youtubeUrl}
-          isPlaying={isPlaying}
-          playbackSeconds={playbackSeconds}
-          playbackUpdatedAt={playbackUpdatedAt}
-        />
-
-        <div className="player-controls">
-          <button onClick={onPlayForEveryone} disabled={syncingPlayback || !roomState}>
-            Reproducir para todos
-          </button>
-
-          <button onClick={onPauseForEveryone} disabled={syncingPlayback || !roomState}>
-            Pausar para todos
-          </button>
-
-          <button onClick={onSyncToStart} disabled={syncingPlayback || !roomState}>
-            Reiniciar para todos
-          </button>
-        </div>
-      </div>
-
-      <hr />
-
-<div className="chat-panel">
-  <h2>Chat de la sala</h2>
-
-  <div className="chat-messages">
-    {chatMessages.length === 0 ? (
-      <p className="empty-chat">Todavía no hay mensajes.</p>
-    ) : (
-      chatMessages.map((chatMessage) => (
-        <div className="chat-message" key={chatMessage.id}>
-          <div className="chat-message-header">
-            <strong>{chatMessage.username}</strong>
-            <span>
-              {new Date(chatMessage.created_at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-
-          <p>{chatMessage.content}</p>
-        </div>
-      ))
-    )}
-  </div>
-
-  <div className="chat-form">
-    <input
-      value={chatInput}
-      onChange={(event) => onChatInputChange(event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          onSendChatMessage();
-        }
-      }}
-      placeholder="Escribe un mensaje..."
-    />
-
-    <button onClick={onSendChatMessage} disabled={sendingChatMessage}>
-      {sendingChatMessage ? "Enviando..." : "Enviar"}
-    </button>
-  </div>
-</div>
-      <button className="secondary" onClick={onLeaveRoom}>
+           <button className="secondary" onClick={onLeaveRoom}>
         Salir de la sala
       </button>
     </section>
-  );
+  </aside>
+</main>
+);
 }
