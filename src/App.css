@@ -631,3 +631,136 @@ hr {
 .floating-window-header .layer-controls {
   margin-left: 8px;
 }
+
+.drawing-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 320px);
+  padding: 8px;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+}
+
+.drawing-tool-buttons {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.drawing-toolbar button,
+.drawing-toolbar select,
+.drawing-toolbar input {
+  margin: 0;
+}
+
+.drawing-toolbar button {
+  width: auto;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.drawing-toolbar button.active {
+  background: #facc15;
+  color: #422006;
+}
+
+.drawing-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.drawing-field span {
+  color: #cbd5e1;
+}
+
+.drawing-field select {
+  width: auto;
+  min-width: 92px;
+  height: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  padding: 0 8px;
+  font-weight: 700;
+}
+
+.drawing-field input[type="color"] {
+  width: 38px;
+  height: 34px;
+  min-width: 0;
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.drawing-field input[type="range"] {
+  width: 88px;
+  min-width: 88px;
+  padding: 0;
+}
+
+.drawing-clear-button {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  font-size: 12px !important;
+}
+
+.drawing-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.background-drawing-canvas {
+  z-index: 0;
+}
+
+.canvas-world-grid {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.design-surface .canvas-empty-state {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.overlay-drawing-canvas {
+  z-index: 210;
+}
+
+.design-surface.is-drawing-mode {
+  cursor: crosshair;
+}
+
+.design-surface.is-drawing-mode .canvas-layer,
+.design-surface.is-drawing-mode .floating-window {
+  cursor: default;
+}
+
+@media (max-width: 980px) {
+  .drawing-toolbar {
+    right: 16px;
+    max-width: calc(100% - 32px);
+    flex-wrap: wrap;
+  }
+}

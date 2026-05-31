@@ -4,8 +4,13 @@ import {
   getPastedCanvasImage,
   isTypingInEditableElement,
 } from "./canvasClipboard";
+import { DrawingCanvas } from "./DrawingCanvas";
+import { DrawingToolbar } from "./DrawingToolbar";
+import { useCanvasStrokes } from "./useCanvasStrokes";
 import { useCanvasViewport } from "./useCanvasViewport";
-import type { Tool } from "./canvasTypes";
+import { useDrawing } from "./useDrawing";
+import { DEFAULT_DRAWING_SETTINGS } from "./drawingTypes";
+import type { DrawingSettings } from "./drawingTypes";
 
 const WORLD_WIDTH = 6000;
 const WORLD_HEIGHT = 4000;
@@ -13,7 +18,7 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 
 type CanvasViewportProps = {
-  activeTool: Tool;
+  roomId: string;
   children?: ReactNode;
   onPasteImage?: (payload: {
     src: string;
@@ -26,7 +31,7 @@ type CanvasViewportProps = {
 };
 
 export function CanvasViewport({
-  activeTool,
+  roomId,
   children,
   onPasteImage,
   onCanvasMouseDown,
@@ -44,6 +49,12 @@ export function CanvasViewport({
     height: 1,
   });
   const [isPanning, setIsPanning] = useState(false);
+  const [drawingSettings, setDrawingSettings] = useState<DrawingSettings>(
+    DEFAULT_DRAWING_SETTINGS
+  );
+
+  const { strokes, isLoadingStrokes, addStroke, clearLayer } =
+    useCanvasStrokes(roomId);
 
   const { view, zoomAtPoint, panByPointerDrag, zoomIn, zoomOut, resetView } =
     useCanvasViewport({
@@ -52,6 +63,15 @@ export function CanvasViewport({
       worldWidth: WORLD_WIDTH,
       worldHeight: WORLD_HEIGHT,
     });
+
+  const { previewStroke, handleDrawingMouseDown } = useDrawing({
+    settings: drawingSettings,
+    view,
+    viewportRef,
+    onCommitStroke: (settings, points) => {
+      void addStroke(settings, points);
+    },
+  });
 
   useEffect(() => {
     if (!viewportRef.current) {
@@ -193,7 +213,7 @@ export function CanvasViewport({
         setIsPanning(false);
       }}
       onMouseDown={(event) => {
-        const shouldPan = event.button === 1 || activeTool === "hand";
+        const shouldPan = event.button === 1 || drawingSettings.tool === "pan";
 
         if (!shouldPan) {
           return;
@@ -217,15 +237,41 @@ export function CanvasViewport({
         <span>{Math.round(view.zoom * 100)}%</span>
       </div>
 
+      <DrawingToolbar
+        settings={drawingSettings}
+        isLoading={isLoadingStrokes}
+        onSettingsChange={setDrawingSettings}
+        onClearLayer={(layerType) => {
+          void clearLayer(layerType);
+        }}
+      />
+
       <div
-        className="design-surface"
-        onMouseDown={() => onCanvasMouseDown?.()}
+        className={
+          drawingSettings.tool === "pan"
+            ? "design-surface"
+            : "design-surface is-drawing-mode"
+        }
+        onMouseDown={(event) => {
+          handleDrawingMouseDown(event);
+          onCanvasMouseDown?.();
+        }}
         style={{
           width: WORLD_WIDTH,
           height: WORLD_HEIGHT,
           transform: `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`,
         }}
       >
+        <DrawingCanvas
+          layerType="background"
+          width={WORLD_WIDTH}
+          height={WORLD_HEIGHT}
+          strokes={strokes}
+          previewStroke={previewStroke}
+          settings={drawingSettings}
+          className="drawing-canvas background-drawing-canvas"
+        />
+
         <div className="canvas-world-grid" />
 
         <div className="canvas-empty-state">
@@ -236,6 +282,16 @@ export function CanvasViewport({
           </p>
         </div>
         {children}
+
+        <DrawingCanvas
+          layerType="overlay"
+          width={WORLD_WIDTH}
+          height={WORLD_HEIGHT}
+          strokes={strokes}
+          previewStroke={previewStroke}
+          settings={drawingSettings}
+          className="drawing-canvas overlay-drawing-canvas"
+        />
       </div>
     </section>
   );
