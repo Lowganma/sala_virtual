@@ -7,9 +7,20 @@ import type {
   StrokePoint,
 } from "./drawingTypes";
 
-type StrokeRow = Omit<CanvasStroke, "size" | "opacity" | "points"> & {
+type StrokeRow = Omit<
+  CanvasStroke,
+  | "size"
+  | "opacity"
+  | "brush_intensity"
+  | "brush_softness"
+  | "brush_smoothing"
+  | "points"
+> & {
   size: number | string;
   opacity: number | string;
+  brush_intensity?: number | string | null;
+  brush_softness?: number | string | null;
+  brush_smoothing?: number | string | null;
   points: unknown;
 };
 
@@ -23,6 +34,12 @@ function isStrokePoint(value: unknown): value is StrokePoint {
   return typeof point.x === "number" && typeof point.y === "number";
 }
 
+function numberOrDefault(value: number | string | null | undefined, fallback: number) {
+  const numericValue = Number(value);
+
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
 function normalizeStroke(row: StrokeRow): CanvasStroke {
   const points = Array.isArray(row.points)
     ? row.points.filter(isStrokePoint)
@@ -30,8 +47,11 @@ function normalizeStroke(row: StrokeRow): CanvasStroke {
 
   return {
     ...row,
-    size: Number(row.size),
-    opacity: Number(row.opacity),
+    size: numberOrDefault(row.size, 4),
+    opacity: numberOrDefault(row.opacity, 1),
+    brush_intensity: numberOrDefault(row.brush_intensity, 1),
+    brush_softness: numberOrDefault(row.brush_softness, 0.25),
+    brush_smoothing: numberOrDefault(row.brush_smoothing, 0.35),
     points,
   };
 }
@@ -125,6 +145,7 @@ export function useCanvasStrokes(roomId: string) {
         return;
       }
 
+      const isBrush = settings.tool === "brush";
       const { data, error } = await supabase
         .from("canvas_strokes")
         .insert({
@@ -134,6 +155,9 @@ export function useCanvasStrokes(roomId: string) {
           color: settings.color,
           size: settings.size,
           opacity: settings.tool === "pencil" ? 1 : settings.opacity,
+          brush_intensity: isBrush ? settings.brushIntensity : 1,
+          brush_softness: isBrush ? settings.brushSoftness : 0,
+          brush_smoothing: isBrush ? settings.brushSmoothing : 0,
           points,
         })
         .select()
@@ -159,6 +183,37 @@ export function useCanvasStrokes(roomId: string) {
     [roomId]
   );
 
+  const deleteStroke = useCallback(async (strokeId: string) => {
+    setStrokes((currentStrokes) =>
+      currentStrokes.filter((stroke) => stroke.id !== strokeId)
+    );
+
+    const { error } = await supabase
+      .from("canvas_strokes")
+      .delete()
+      .eq("id", strokeId);
+
+    if (error) {
+      console.error(error);
+    }
+  }, []);
+
+  const undoLastStroke = useCallback(
+    async (layerType?: DrawingLayerType) => {
+      const candidates = layerType
+        ? strokes.filter((stroke) => stroke.layer_type === layerType)
+        : strokes;
+      const lastStroke = candidates.at(-1);
+
+      if (!lastStroke) {
+        return;
+      }
+
+      await deleteStroke(lastStroke.id);
+    },
+    [deleteStroke, strokes]
+  );
+
   const clearLayer = useCallback(
     async (layerType: DrawingLayerType) => {
       setStrokes((currentStrokes) =>
@@ -182,6 +237,7 @@ export function useCanvasStrokes(roomId: string) {
     strokes,
     isLoadingStrokes,
     addStroke,
+    undoLastStroke,
     clearLayer,
   };
 }

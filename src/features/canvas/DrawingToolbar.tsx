@@ -1,9 +1,14 @@
-import type { DrawingLayerType, DrawingSettings, DrawingTool } from "./drawingTypes";
+import type {
+  DrawingLayerType,
+  DrawingSettings,
+  DrawingTool,
+} from "./drawingTypes";
 
 type DrawingToolbarProps = {
   settings: DrawingSettings;
   isLoading?: boolean;
   onSettingsChange: (settings: DrawingSettings) => void;
+  onUndoStroke?: () => void;
   onClearLayer?: (layerType: DrawingLayerType) => void;
 };
 
@@ -18,8 +23,11 @@ export function DrawingToolbar({
   settings,
   isLoading = false,
   onSettingsChange,
+  onUndoStroke,
   onClearLayer,
 }: DrawingToolbarProps) {
+  const isBrush = settings.tool === "brush";
+
   function updateSettings(partialSettings: Partial<DrawingSettings>) {
     onSettingsChange({
       ...settings,
@@ -97,6 +105,62 @@ export function DrawingToolbar({
           }
         />
       </label>
+
+      <label className="drawing-field brush-field">
+        <span>Intensidad {Math.round(settings.brushIntensity * 100)}%</span>
+        <input
+          type="range"
+          min="0.1"
+          max="1"
+          step="0.05"
+          value={settings.brushIntensity}
+          disabled={!isBrush}
+          onChange={(event) =>
+            updateSettings({ brushIntensity: Number(event.target.value) })
+          }
+        />
+      </label>
+
+      <label className="drawing-field brush-field">
+        <span>Suavidad {Math.round(settings.brushSoftness * 100)}%</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={settings.brushSoftness}
+          disabled={!isBrush}
+          onChange={(event) =>
+            updateSettings({ brushSoftness: Number(event.target.value) })
+          }
+        />
+      </label>
+
+      <label className="drawing-field brush-field">
+        <span>Suavizado {Math.round(settings.brushSmoothing * 100)}%</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={settings.brushSmoothing}
+          disabled={!isBrush}
+          onChange={(event) =>
+            updateSettings({ brushSmoothing: Number(event.target.value) })
+          }
+        />
+      </label>
+
+      {onUndoStroke && (
+        <button
+          type="button"
+          className="drawing-undo-button"
+          onClick={onUndoStroke}
+          title="Deshacer último trazo de la capa activa (Ctrl+Z)"
+        >
+          Deshacer
+        </button>
+      )}
 
       {onClearLayer && (
         <button

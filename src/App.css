@@ -764,3 +764,94 @@ hr {
     flex-wrap: wrap;
   }
 }
+
+.element-selection-toolbar {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 230;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 260px);
+  padding: 8px 10px;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.element-selection-toolbar strong {
+  font-size: 12px;
+}
+
+.element-selection-toolbar span {
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.element-selection-toolbar button {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.lock-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid rgba(250, 204, 21, 0.38);
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.16);
+  color: #fde68a;
+  font-size: 11px;
+  font-weight: 800;
+  user-select: none;
+}
+
+.canvas-layer.locked.selected::after,
+.floating-window.locked.selected {
+  outline-color: rgba(250, 204, 21, 0.8);
+}
+
+.canvas-layer.locked,
+.floating-window.locked .floating-window-header {
+  cursor: not-allowed;
+}
+
+.drawing-undo-button {
+  background: rgba(99, 102, 241, 0.3);
+  color: #e0e7ff;
+  border: 1px solid rgba(129, 140, 248, 0.34);
+  font-size: 12px !important;
+}
+
+.brush-field input:disabled,
+.drawing-field input:disabled {
+  opacity: 0.45;
+}
+
+@media (max-width: 980px) {
+  .element-selection-toolbar {
+    right: 16px;
+    max-width: calc(100% - 32px);
+    flex-wrap: wrap;
+  }
+}
+
+.canvas-layer > .lock-badge {
+  position: absolute;
+  left: 0;
+  top: -30px;
+  z-index: 8;
+}
+
+.floating-window-header .lock-badge {
+  margin-left: 8px;
+}

@@ -15,6 +15,9 @@ export type CanvasStroke = {
   color: string;
   size: number;
   opacity: number;
+  brush_intensity: number;
+  brush_softness: number;
+  brush_smoothing: number;
   points: StrokePoint[];
   created_at: string;
 };
@@ -25,6 +28,9 @@ export type DrawingSettings = {
   color: string;
   size: number;
   opacity: number;
+  brushIntensity: number;
+  brushSoftness: number;
+  brushSmoothing: number;
 };
 
 export const DEFAULT_DRAWING_SETTINGS: DrawingSettings = {
@@ -33,4 +39,7 @@ export const DEFAULT_DRAWING_SETTINGS: DrawingSettings = {
   color: "#ffffff",
   size: 4,
   opacity: 1,
+  brushIntensity: 1,
+  brushSoftness: 0.25,
+  brushSmoothing: 0.35,
 };

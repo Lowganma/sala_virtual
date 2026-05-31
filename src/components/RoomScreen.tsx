@@ -27,6 +27,11 @@ type LayerEntry =
   | { key: string; type: "canvas"; id: string }
   | { key: string; type: "window"; windowKey: string };
 
+type ElementGroup = {
+  id: string;
+  elementKeys: string[];
+};
+
 type RoomScreenProps = {
   room: Room;
   roomState: RoomState | null;
@@ -69,6 +74,36 @@ type RoomScreenProps = {
   ) => void;
   onLeaveRoom: () => void;
 };
+
+function loadElementPreferences(roomId: string) {
+  const savedState = window.localStorage.getItem(`sala-virtual-elements-${roomId}`);
+
+  if (!savedState) {
+    return {
+      lockedElementKeys: new Set<string>(),
+      elementGroups: [] as ElementGroup[],
+    };
+  }
+
+  try {
+    const parsedState = JSON.parse(savedState) as {
+      lockedElementKeys?: string[];
+      elementGroups?: ElementGroup[];
+    };
+
+    return {
+      lockedElementKeys: new Set(parsedState.lockedElementKeys ?? []),
+      elementGroups: parsedState.elementGroups ?? [],
+    };
+  } catch (error) {
+    console.error(error);
+
+    return {
+      lockedElementKeys: new Set<string>(),
+      elementGroups: [] as ElementGroup[],
+    };
+  }
+}
 
 function isTypingInEditableElement() {
   const activeElement = document.activeElement;
@@ -114,13 +149,16 @@ export function RoomScreen({
   onMoveCanvasLayerInStack,
   onLeaveRoom,
 }: RoomScreenProps) {
-  const [selectedWindowKey, setSelectedWindowKey] = useState<string | null>(
-    null
-  );
-  const [selectedCanvasLayerId, setSelectedCanvasLayerId] = useState<
-    string | null
-  >(null);
   const [manualLayerOrder, setManualLayerOrder] = useState<string[]>([]);
+  const [selectedElementKeys, setSelectedElementKeys] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [lockedElementKeys, setLockedElementKeys] = useState<Set<string>>(
+    () => loadElementPreferences(room.id).lockedElementKeys
+  );
+  const [elementGroups, setElementGroups] = useState<ElementGroup[]>(
+    () => loadElementPreferences(room.id).elementGroups
+  );
 
   const sortedCanvasLayers = useMemo(
     () =>
@@ -181,6 +219,115 @@ export function RoomScreen({
     [effectiveLayerOrder]
   );
 
+  const selectedKeys = useMemo(
+    () => Array.from(selectedElementKeys),
+    [selectedElementKeys]
+  );
+
+  const storageKey = `sala-virtual-elements-${room.id}`;
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        lockedElementKeys: Array.from(lockedElementKeys),
+        elementGroups,
+      })
+    );
+  }, [elementGroups, lockedElementKeys, storageKey]);
+
+  function getGroupForElement(elementKey: string) {
+    return elementGroups.find((group) => group.elementKeys.includes(elementKey));
+  }
+
+  function getMoveGroupKeys(elementKey: string) {
+    const group = getGroupForElement(elementKey);
+
+    return group ? group.elementKeys : [elementKey];
+  }
+
+  function isElementLocked(elementKey: string) {
+    return lockedElementKeys.has(elementKey);
+  }
+
+  function selectElement(elementKey: string, addToSelection = false) {
+    setSelectedElementKeys((currentSelection) => {
+      if (!addToSelection) {
+        return new Set([elementKey]);
+      }
+
+      const nextSelection = new Set(currentSelection);
+
+      if (nextSelection.has(elementKey)) {
+        nextSelection.delete(elementKey);
+      } else {
+        nextSelection.add(elementKey);
+      }
+
+      if (nextSelection.size === 0) {
+        nextSelection.add(elementKey);
+      }
+
+      return nextSelection;
+    });
+  }
+
+  function clearElementSelection() {
+    setSelectedElementKeys(new Set());
+  }
+
+  function toggleSelectedElementLock() {
+    if (selectedKeys.length === 0) {
+      return;
+    }
+
+    const shouldUnlock = selectedKeys.every((key) => lockedElementKeys.has(key));
+
+    setLockedElementKeys((currentLockedKeys) => {
+      const nextLockedKeys = new Set(currentLockedKeys);
+
+      for (const key of selectedKeys) {
+        if (shouldUnlock) {
+          nextLockedKeys.delete(key);
+        } else {
+          nextLockedKeys.add(key);
+        }
+      }
+
+      return nextLockedKeys;
+    });
+  }
+
+  function groupSelectedElements() {
+    if (selectedKeys.length < 2) {
+      return;
+    }
+
+    const nextGroup: ElementGroup = {
+      id: crypto.randomUUID(),
+      elementKeys: selectedKeys,
+    };
+
+    setElementGroups((currentGroups) => [
+      ...currentGroups.filter(
+        (group) => !group.elementKeys.some((key) => selectedElementKeys.has(key))
+      ),
+      nextGroup,
+    ]);
+  }
+
+  function ungroupSelectedElements() {
+    if (selectedKeys.length === 0) {
+      return;
+    }
+
+    setElementGroups((currentGroups) =>
+      currentGroups.filter(
+        (group) => !group.elementKeys.some((key) => selectedElementKeys.has(key))
+      )
+    );
+  }
+
   function getWindowPosition(
     windowKey: string,
     fallback: WindowPosition
@@ -226,6 +373,10 @@ export function RoomScreen({
     layerKey: string,
     direction: "backward" | "forward"
   ) {
+    if (isElementLocked(layerKey)) {
+      return;
+    }
+
     const currentIndex = effectiveLayerOrder.findIndex(
       (entry) => entry.key === layerKey
     );
@@ -254,6 +405,118 @@ export function RoomScreen({
     if (currentEntry.type === "canvas" && targetEntry.type === "canvas") {
       onMoveCanvasLayerInStack(currentEntry.id, direction);
     }
+  }
+
+  function moveCanvasLayerWithGroup(
+    id: string,
+    nextPosition: WindowPosition
+  ) {
+    const elementKey = `canvas:${id}`;
+
+    if (isElementLocked(elementKey)) {
+      return;
+    }
+
+    const currentLayer = canvasLayers.find((layer) => layer.id === id);
+
+    if (!currentLayer) {
+      return;
+    }
+
+    const deltaX = nextPosition.x - currentLayer.x;
+    const deltaY = nextPosition.y - currentLayer.y;
+
+    for (const groupKey of getMoveGroupKeys(elementKey)) {
+      if (isElementLocked(groupKey)) {
+        continue;
+      }
+
+      if (groupKey.startsWith("canvas:")) {
+        const layerId = groupKey.replace("canvas:", "");
+        const layer = canvasLayers.find(
+          (canvasLayer) => canvasLayer.id === layerId
+        );
+
+        if (layer) {
+          void onMoveCanvasLayer(layerId, {
+            x: layer.x + deltaX,
+            y: layer.y + deltaY,
+          });
+        }
+
+        continue;
+      }
+
+      const windowKey = groupKey.replace("window:", "");
+      const position = getWindowPosition(windowKey, { x: 0, y: 0 });
+      onWindowPositionChange(windowKey, {
+        x: position.x + deltaX,
+        y: position.y + deltaY,
+      });
+    }
+  }
+
+  function moveWindowWithGroup(
+    windowKey: string,
+    nextPosition: WindowPosition
+  ) {
+    const elementKey = `window:${windowKey}`;
+
+    if (isElementLocked(elementKey)) {
+      return;
+    }
+
+    const currentPosition = getWindowPosition(windowKey, { x: 0, y: 0 });
+    const deltaX = nextPosition.x - currentPosition.x;
+    const deltaY = nextPosition.y - currentPosition.y;
+
+    for (const groupKey of getMoveGroupKeys(elementKey)) {
+      if (isElementLocked(groupKey)) {
+        continue;
+      }
+
+      if (groupKey.startsWith("canvas:")) {
+        const layerId = groupKey.replace("canvas:", "");
+        const layer = canvasLayers.find(
+          (canvasLayer) => canvasLayer.id === layerId
+        );
+
+        if (layer) {
+          void onMoveCanvasLayer(layerId, {
+            x: layer.x + deltaX,
+            y: layer.y + deltaY,
+          });
+        }
+
+        continue;
+      }
+
+      const groupedWindowKey = groupKey.replace("window:", "");
+      const position = getWindowPosition(groupedWindowKey, { x: 0, y: 0 });
+      onWindowPositionChange(groupedWindowKey, {
+        x: position.x + deltaX,
+        y: position.y + deltaY,
+      });
+    }
+  }
+
+  function resizeCanvasLayerIfUnlocked(
+    id: string,
+    nextSize: { w: number; h: number }
+  ) {
+    if (isElementLocked(`canvas:${id}`)) {
+      return;
+    }
+
+    void onResizeCanvasLayer(id, nextSize);
+  }
+
+  function resizeWindowIfUnlocked(windowKey: string, nextSize: WindowSize) {
+    if (isElementLocked(`window:${windowKey}`)) {
+      return;
+    }
+
+    onWindowSizeChange(windowKey, nextSize);
   }
 
   function toggleWindow(windowKey: string) {
@@ -288,13 +551,21 @@ export function RoomScreen({
         return;
       }
 
-      if (!selectedCanvasLayerId) {
+      const selectedCanvasIds = selectedKeys
+        .filter((key) => key.startsWith("canvas:") && !lockedElementKeys.has(key))
+        .map((key) => key.replace("canvas:", ""));
+
+      if (selectedCanvasIds.length === 0) {
         return;
       }
 
       event.preventDefault();
-      void onDeleteCanvasLayer(selectedCanvasLayerId);
-      setSelectedCanvasLayerId(null);
+
+      for (const id of selectedCanvasIds) {
+        void onDeleteCanvasLayer(id);
+      }
+
+      clearElementSelection();
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -302,28 +573,57 @@ export function RoomScreen({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onDeleteCanvasLayer, selectedCanvasLayerId]);
+  }, [lockedElementKeys, onDeleteCanvasLayer, selectedKeys]);
+
+  const selectedItemsAreLocked =
+    selectedKeys.length > 0 && selectedKeys.every((key) => isElementLocked(key));
+  const selectedItemsHaveGroup = selectedKeys.some((key) => getGroupForElement(key));
 
   return (
     <main className="room-layout">
+      {selectedKeys.length > 0 && (
+        <div
+          className="element-selection-toolbar"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <strong>{selectedKeys.length} seleccionado(s)</strong>
+          <span>Shift + click para multiselección</span>
+          <button type="button" onClick={toggleSelectedElementLock}>
+            {selectedItemsAreLocked ? "Desbloquear" : "Bloquear"}
+          </button>
+          <button
+            type="button"
+            onClick={groupSelectedElements}
+            disabled={selectedKeys.length < 2}
+          >
+            Agrupar
+          </button>
+          <button
+            type="button"
+            onClick={ungroupSelectedElements}
+            disabled={!selectedItemsHaveGroup}
+          >
+            Desagrupar
+          </button>
+        </div>
+      )}
+
       <CanvasArea
         roomId={room.id}
         onPasteImage={handlePasteImage}
-        onCanvasMouseDown={() => {
-          setSelectedCanvasLayerId(null);
-          setSelectedWindowKey(null);
-        }}
+        onCanvasMouseDown={clearElementSelection}
       >
         {sortedCanvasLayers.map((layer) => (
           <CanvasImageLayer
             key={layer.id}
             layer={layer}
-            isSelected={selectedCanvasLayerId === layer.id}
-            onSelect={setSelectedCanvasLayerId}
-            onMove={(id, nextPosition) =>
-              void onMoveCanvasLayer(id, nextPosition)
+            isSelected={selectedElementKeys.has(`canvas:${layer.id}`)}
+            isLocked={isElementLocked(`canvas:${layer.id}`)}
+            onSelect={(id, addToSelection) =>
+              selectElement(`canvas:${id}`, addToSelection)
             }
-            onResize={(id, nextSize) => void onResizeCanvasLayer(id, nextSize)}
+            onMove={moveCanvasLayerWithGroup}
+            onResize={resizeCanvasLayerIfUnlocked}
             zIndex={getVisualZIndex(`canvas:${layer.id}`)}
             layerIndex={getLayerIndex(`canvas:${layer.id}`)}
             layerCount={effectiveLayerOrder.length}
@@ -338,21 +638,34 @@ export function RoomScreen({
             className="room-info-window"
             position={getWindowPosition("room-info", { x: 120, y: 120 })}
             size={getWindowSize("room-info", { width: 260, height: 180 })}
-            isSelected={selectedWindowKey === "room-info"}
+            isSelected={selectedElementKeys.has("window:room-info")}
+            isLocked={isElementLocked("window:room-info")}
             zIndex={getVisualZIndex("window:room-info")}
             layerIndex={getLayerIndex("window:room-info")}
             layerCount={effectiveLayerOrder.length}
-            canMoveBackward={getLayerIndex("window:room-info") > 1}
+            canMoveBackward={
+              !isElementLocked("window:room-info") &&
+              getLayerIndex("window:room-info") > 1
+            }
             canMoveForward={
+              !isElementLocked("window:room-info") &&
               getLayerIndex("window:room-info") < effectiveLayerOrder.length
             }
-            onMoveBackward={() => moveElementInStack("window:room-info", "backward")}
-            onMoveForward={() => moveElementInStack("window:room-info", "forward")}
-            onSelect={() => setSelectedWindowKey("room-info")}
-            onPositionChange={(nextPosition) =>
-              onWindowPositionChange("room-info", nextPosition)
+            onMoveBackward={() =>
+              moveElementInStack("window:room-info", "backward")
             }
-            onSizeChange={(nextSize) => onWindowSizeChange("room-info", nextSize)}
+            onMoveForward={() =>
+              moveElementInStack("window:room-info", "forward")
+            }
+            onSelect={(addToSelection) =>
+              selectElement("window:room-info", addToSelection)
+            }
+            onPositionChange={(nextPosition) =>
+              moveWindowWithGroup("room-info", nextPosition)
+            }
+            onSizeChange={(nextSize) =>
+              resizeWindowIfUnlocked("room-info", nextSize)
+            }
           >
             <RoomInfoPanel room={room} username={username} />
 
@@ -368,21 +681,28 @@ export function RoomScreen({
             className="music-window"
             position={getWindowPosition("music", { x: 440, y: 120 })}
             size={getWindowSize("music", { width: 280, height: 520 })}
-            isSelected={selectedWindowKey === "music"}
+            isSelected={selectedElementKeys.has("window:music")}
+            isLocked={isElementLocked("window:music")}
             zIndex={getVisualZIndex("window:music")}
             layerIndex={getLayerIndex("window:music")}
             layerCount={effectiveLayerOrder.length}
-            canMoveBackward={getLayerIndex("window:music") > 1}
+            canMoveBackward={
+              !isElementLocked("window:music") &&
+              getLayerIndex("window:music") > 1
+            }
             canMoveForward={
+              !isElementLocked("window:music") &&
               getLayerIndex("window:music") < effectiveLayerOrder.length
             }
             onMoveBackward={() => moveElementInStack("window:music", "backward")}
             onMoveForward={() => moveElementInStack("window:music", "forward")}
-            onSelect={() => setSelectedWindowKey("music")}
-            onPositionChange={(nextPosition) =>
-              onWindowPositionChange("music", nextPosition)
+            onSelect={(addToSelection) =>
+              selectElement("window:music", addToSelection)
             }
-            onSizeChange={(nextSize) => onWindowSizeChange("music", nextSize)}
+            onPositionChange={(nextPosition) =>
+              moveWindowWithGroup("music", nextPosition)
+            }
+            onSizeChange={(nextSize) => resizeWindowIfUnlocked("music", nextSize)}
           >
             <MusicPanel
               youtubePlayerRef={youtubePlayerRef}
@@ -408,21 +728,28 @@ export function RoomScreen({
             className="chat-window"
             position={getWindowPosition("chat", { x: 820, y: 120 })}
             size={getWindowSize("chat", { width: 280, height: 360 })}
-            isSelected={selectedWindowKey === "chat"}
+            isSelected={selectedElementKeys.has("window:chat")}
+            isLocked={isElementLocked("window:chat")}
             zIndex={getVisualZIndex("window:chat")}
             layerIndex={getLayerIndex("window:chat")}
             layerCount={effectiveLayerOrder.length}
-            canMoveBackward={getLayerIndex("window:chat") > 1}
+            canMoveBackward={
+              !isElementLocked("window:chat") &&
+              getLayerIndex("window:chat") > 1
+            }
             canMoveForward={
+              !isElementLocked("window:chat") &&
               getLayerIndex("window:chat") < effectiveLayerOrder.length
             }
             onMoveBackward={() => moveElementInStack("window:chat", "backward")}
             onMoveForward={() => moveElementInStack("window:chat", "forward")}
-            onSelect={() => setSelectedWindowKey("chat")}
-            onPositionChange={(nextPosition) =>
-              onWindowPositionChange("chat", nextPosition)
+            onSelect={(addToSelection) =>
+              selectElement("window:chat", addToSelection)
             }
-            onSizeChange={(nextSize) => onWindowSizeChange("chat", nextSize)}
+            onPositionChange={(nextPosition) =>
+              moveWindowWithGroup("chat", nextPosition)
+            }
+            onSizeChange={(nextSize) => resizeWindowIfUnlocked("chat", nextSize)}
           >
             <ChatPanel
               chatMessages={chatMessages}

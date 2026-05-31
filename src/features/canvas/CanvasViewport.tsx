@@ -53,7 +53,7 @@ export function CanvasViewport({
     DEFAULT_DRAWING_SETTINGS
   );
 
-  const { strokes, isLoadingStrokes, addStroke, clearLayer } =
+  const { strokes, isLoadingStrokes, addStroke, undoLastStroke, clearLayer } =
     useCanvasStrokes(roomId);
 
   const { view, zoomAtPoint, panByPointerDrag, zoomIn, zoomOut, resetView } =
@@ -125,6 +125,27 @@ export function CanvasViewport({
       viewportElement.removeEventListener("wheel", handleWheel);
     };
   }, [viewportSize.width, viewportSize.height, zoomAtPoint]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") {
+        return;
+      }
+
+      if (isTypingInEditableElement()) {
+        return;
+      }
+
+      event.preventDefault();
+      void undoLastStroke(drawingSettings.layerType);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [drawingSettings.layerType, undoLastStroke]);
 
   useEffect(() => {
     function pasteAtViewportCenter({
@@ -241,6 +262,9 @@ export function CanvasViewport({
         settings={drawingSettings}
         isLoading={isLoadingStrokes}
         onSettingsChange={setDrawingSettings}
+        onUndoStroke={() => {
+          void undoLastStroke(drawingSettings.layerType);
+        }}
         onClearLayer={(layerType) => {
           void clearLayer(layerType);
         }}
