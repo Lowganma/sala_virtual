@@ -25,6 +25,19 @@ export type CanvasStroke = {
   created_at: string;
 };
 
+export type DrawingStrokeDraft = Pick<
+  CanvasStroke,
+  | "layer_type"
+  | "tool"
+  | "color"
+  | "size"
+  | "opacity"
+  | "brush_intensity"
+  | "brush_softness"
+  | "brush_smoothing"
+  | "points"
+>;
+
 export type DrawingSettings = {
   tool: DrawingTool;
   layerType: DrawingLayerType;
