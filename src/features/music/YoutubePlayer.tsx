@@ -104,7 +104,7 @@ export const YouTubePlayer = forwardRef<
   const lastAppliedSyncRef = useRef<string>("");
 
   const videoId = getYoutubeVideoId(youtubeUrl);
-  const syncCompensationSeconds = 0.35; // Compensación para la latencia de red y procesamiento
+  const syncCompensationSeconds = 0; // Compensación para la latencia de red y procesamiento
 
   useImperativeHandle(ref, () => ({
     getCurrentTime() {
