@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { LayerControls } from "../layers/LayerControls";
 import type { WindowPosition, WindowSize } from "./windowTypes";
 
 type FloatingWindowProps = {
@@ -8,6 +9,13 @@ type FloatingWindowProps = {
   position: WindowPosition;
   size: WindowSize;
   isSelected: boolean;
+  zIndex: number;
+  layerIndex: number;
+  layerCount: number;
+  canMoveBackward: boolean;
+  canMoveForward: boolean;
+  onMoveBackward: () => void;
+  onMoveForward: () => void;
   onSelect: () => void;
   onPositionChange: (nextPosition: WindowPosition) => void;
   onSizeChange: (nextSize: WindowSize) => void;
@@ -20,6 +28,13 @@ export function FloatingWindow({
   position,
   size,
   isSelected,
+  zIndex,
+  layerIndex,
+  layerCount,
+  canMoveBackward,
+  canMoveForward,
+  onMoveBackward,
+  onMoveForward,
   onSelect,
   onPositionChange,
   onSizeChange,
@@ -146,6 +161,7 @@ export function FloatingWindow({
         top: localPosition.y,
         width: localSize.width,
         height: localSize.height,
+        zIndex,
       }}
       onMouseDown={(event) => {
         event.stopPropagation();
@@ -167,6 +183,17 @@ export function FloatingWindow({
         }}
       >
         <strong>{title}</strong>
+        {isSelected && (
+          <LayerControls
+            label="Ventana"
+            layerIndex={layerIndex}
+            layerCount={layerCount}
+            canMoveBackward={canMoveBackward}
+            canMoveForward={canMoveForward}
+            onMoveBackward={onMoveBackward}
+            onMoveForward={onMoveForward}
+          />
+        )}
         <span>⋮</span>
       </header>
 

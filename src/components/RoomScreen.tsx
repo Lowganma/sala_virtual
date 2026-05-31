@@ -23,6 +23,10 @@ type CanvasLayerPayload = {
   file?: File;
 };
 
+type LayerEntry =
+  | { key: string; type: "canvas"; id: string }
+  | { key: string; type: "window"; windowKey: string };
+
 type RoomScreenProps = {
   room: Room;
   roomState: RoomState | null;
@@ -59,6 +63,10 @@ type RoomScreenProps = {
   onMoveCanvasLayer: (id: string, nextPosition: WindowPosition) => void;
   onResizeCanvasLayer: (id: string, nextSize: { w: number; h: number }) => void;
   onDeleteCanvasLayer: (id: string) => void;
+  onMoveCanvasLayerInStack: (
+    id: string,
+    direction: "backward" | "forward"
+  ) => void;
   onLeaveRoom: () => void;
 };
 
@@ -103,6 +111,7 @@ export function RoomScreen({
   onMoveCanvasLayer,
   onResizeCanvasLayer,
   onDeleteCanvasLayer,
+  onMoveCanvasLayerInStack,
   onLeaveRoom,
 }: RoomScreenProps) {
   const [selectedWindowKey, setSelectedWindowKey] = useState<string | null>(
@@ -111,6 +120,17 @@ export function RoomScreen({
   const [selectedCanvasLayerId, setSelectedCanvasLayerId] = useState<
     string | null
   >(null);
+  const [manualLayerOrder, setManualLayerOrder] = useState<string[]>([]);
+
+  const sortedCanvasLayers = useMemo(
+    () =>
+      [...canvasLayers].sort((firstLayer, secondLayer) =>
+        firstLayer.z === secondLayer.z
+          ? firstLayer.id.localeCompare(secondLayer.id)
+          : firstLayer.z - secondLayer.z
+      ),
+    [canvasLayers]
+  );
 
   const windowsByKey = useMemo(
     () =>
@@ -118,6 +138,47 @@ export function RoomScreen({
         roomWindows.map((roomWindow) => [roomWindow.window_key, roomWindow])
       ),
     [roomWindows]
+  );
+
+  const baseLayerEntries = useMemo<LayerEntry[]>(() => {
+    const canvasEntries = sortedCanvasLayers.map((layer) => ({
+      key: `canvas:${layer.id}`,
+      type: "canvas" as const,
+      id: layer.id,
+    }));
+    const windowEntries = (
+      roomWindows.length > 0
+        ? roomWindows.map((roomWindow) => roomWindow.window_key)
+        : DEFAULT_WINDOWS.map((windowConfig) => windowConfig.window_key)
+    ).map((windowKey) => ({
+      key: `window:${windowKey}`,
+      type: "window" as const,
+      windowKey,
+    }));
+
+    return [...windowEntries, ...canvasEntries];
+  }, [roomWindows, sortedCanvasLayers]);
+
+  const effectiveLayerOrder = useMemo(() => {
+    const entriesByKey = new Map(
+      baseLayerEntries.map((entry) => [entry.key, entry])
+    );
+    const keptEntries = manualLayerOrder
+      .map((key) => entriesByKey.get(key))
+      .filter((entry): entry is LayerEntry => Boolean(entry));
+    const missingEntries = baseLayerEntries.filter(
+      (entry) => !manualLayerOrder.includes(entry.key)
+    );
+
+    return [...keptEntries, ...missingEntries];
+  }, [baseLayerEntries, manualLayerOrder]);
+
+  const layerIndexes = useMemo(
+    () =>
+      new Map(
+        effectiveLayerOrder.map((entry, index) => [entry.key, index + 1])
+      ),
+    [effectiveLayerOrder]
   );
 
   function getWindowPosition(
@@ -151,6 +212,48 @@ export function RoomScreen({
 
   function getWindowIsMinimized(windowKey: string) {
     return Boolean(windowsByKey.get(windowKey)?.is_minimized);
+  }
+
+  function getLayerIndex(layerKey: string) {
+    return layerIndexes.get(layerKey) ?? 1;
+  }
+
+  function getVisualZIndex(layerKey: string) {
+    return 10 + getLayerIndex(layerKey);
+  }
+
+  function moveElementInStack(
+    layerKey: string,
+    direction: "backward" | "forward"
+  ) {
+    const currentIndex = effectiveLayerOrder.findIndex(
+      (entry) => entry.key === layerKey
+    );
+    const targetIndex =
+      direction === "forward" ? currentIndex + 1 : currentIndex - 1;
+
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= effectiveLayerOrder.length
+    ) {
+      return;
+    }
+
+    const currentEntry = effectiveLayerOrder[currentIndex];
+    const targetEntry = effectiveLayerOrder[targetIndex];
+    const nextOrder = effectiveLayerOrder.map((entry) => entry.key);
+
+    [nextOrder[currentIndex], nextOrder[targetIndex]] = [
+      nextOrder[targetIndex],
+      nextOrder[currentIndex],
+    ];
+
+    setManualLayerOrder(nextOrder);
+
+    if (currentEntry.type === "canvas" && targetEntry.type === "canvas") {
+      onMoveCanvasLayerInStack(currentEntry.id, direction);
+    }
   }
 
   function toggleWindow(windowKey: string) {
@@ -210,14 +313,21 @@ export function RoomScreen({
           setSelectedWindowKey(null);
         }}
       >
-        {canvasLayers.map((layer) => (
+        {sortedCanvasLayers.map((layer) => (
           <CanvasImageLayer
             key={layer.id}
             layer={layer}
             isSelected={selectedCanvasLayerId === layer.id}
             onSelect={setSelectedCanvasLayerId}
-            onMove={(id, nextPosition) => void onMoveCanvasLayer(id, nextPosition)}
+            onMove={(id, nextPosition) =>
+              void onMoveCanvasLayer(id, nextPosition)
+            }
             onResize={(id, nextSize) => void onResizeCanvasLayer(id, nextSize)}
+            zIndex={getVisualZIndex(`canvas:${layer.id}`)}
+            layerIndex={getLayerIndex(`canvas:${layer.id}`)}
+            layerCount={effectiveLayerOrder.length}
+            onMoveBackward={(id) => moveElementInStack(`canvas:${id}`, "backward")}
+            onMoveForward={(id) => moveElementInStack(`canvas:${id}`, "forward")}
           />
         ))}
 
@@ -228,6 +338,15 @@ export function RoomScreen({
             position={getWindowPosition("room-info", { x: 120, y: 120 })}
             size={getWindowSize("room-info", { width: 260, height: 180 })}
             isSelected={selectedWindowKey === "room-info"}
+            zIndex={getVisualZIndex("window:room-info")}
+            layerIndex={getLayerIndex("window:room-info")}
+            layerCount={effectiveLayerOrder.length}
+            canMoveBackward={getLayerIndex("window:room-info") > 1}
+            canMoveForward={
+              getLayerIndex("window:room-info") < effectiveLayerOrder.length
+            }
+            onMoveBackward={() => moveElementInStack("window:room-info", "backward")}
+            onMoveForward={() => moveElementInStack("window:room-info", "forward")}
             onSelect={() => setSelectedWindowKey("room-info")}
             onPositionChange={(nextPosition) =>
               onWindowPositionChange("room-info", nextPosition)
@@ -249,6 +368,15 @@ export function RoomScreen({
             position={getWindowPosition("music", { x: 440, y: 120 })}
             size={getWindowSize("music", { width: 280, height: 520 })}
             isSelected={selectedWindowKey === "music"}
+            zIndex={getVisualZIndex("window:music")}
+            layerIndex={getLayerIndex("window:music")}
+            layerCount={effectiveLayerOrder.length}
+            canMoveBackward={getLayerIndex("window:music") > 1}
+            canMoveForward={
+              getLayerIndex("window:music") < effectiveLayerOrder.length
+            }
+            onMoveBackward={() => moveElementInStack("window:music", "backward")}
+            onMoveForward={() => moveElementInStack("window:music", "forward")}
             onSelect={() => setSelectedWindowKey("music")}
             onPositionChange={(nextPosition) =>
               onWindowPositionChange("music", nextPosition)
@@ -280,6 +408,15 @@ export function RoomScreen({
             position={getWindowPosition("chat", { x: 820, y: 120 })}
             size={getWindowSize("chat", { width: 280, height: 360 })}
             isSelected={selectedWindowKey === "chat"}
+            zIndex={getVisualZIndex("window:chat")}
+            layerIndex={getLayerIndex("window:chat")}
+            layerCount={effectiveLayerOrder.length}
+            canMoveBackward={getLayerIndex("window:chat") > 1}
+            canMoveForward={
+              getLayerIndex("window:chat") < effectiveLayerOrder.length
+            }
+            onMoveBackward={() => moveElementInStack("window:chat", "backward")}
+            onMoveForward={() => moveElementInStack("window:chat", "forward")}
             onSelect={() => setSelectedWindowKey("chat")}
             onPositionChange={(nextPosition) =>
               onWindowPositionChange("chat", nextPosition)

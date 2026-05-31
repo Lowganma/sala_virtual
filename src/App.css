@@ -584,3 +584,50 @@ hr {
 .canvas-layer-error span {
   color: #fecaca;
 }
+
+.layer-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.layer-badge {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #e2e8f0;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.layer-button {
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.canvas-layer > .layer-controls {
+  position: absolute;
+  left: 0;
+  top: -34px;
+  z-index: 8;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.floating-window-header .layer-controls {
+  margin-left: 8px;
+}

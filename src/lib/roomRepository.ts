@@ -275,6 +275,17 @@ export async function updateCanvasLayerSize(
     .eq("id", id);
 }
 
+
+export async function updateCanvasLayerZIndex(id: string, zIndex: number) {
+  return supabase
+    .from("canvas_layers")
+    .update({
+      z_index: zIndex,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+}
+
 export async function deleteCanvasLayer(id: string) {
   return supabase.from("canvas_layers").delete().eq("id", id);
 }

@@ -22,6 +22,7 @@ import {
   insertRoom,
   updateCanvasLayerPosition as updateCanvasLayerPositionRow,
   updateCanvasLayerSize as updateCanvasLayerSizeRow,
+  updateCanvasLayerZIndex as updateCanvasLayerZIndexRow,
   updateRoomPlayback,
   updateRoomWindowMinimized as updateRoomWindowMinimizedRow,
   updateRoomWindowPosition as updateRoomWindowPositionRow,
@@ -543,6 +544,57 @@ function App() {
     }
   }
 
+  async function moveCanvasLayerInStack(
+    id: string,
+    direction: "backward" | "forward"
+  ) {
+    const sortedLayers = [...canvasLayers].sort((firstLayer, secondLayer) =>
+      firstLayer.z === secondLayer.z
+        ? firstLayer.id.localeCompare(secondLayer.id)
+        : firstLayer.z - secondLayer.z
+    );
+    const currentIndex = sortedLayers.findIndex((layer) => layer.id === id);
+    const targetIndex =
+      direction === "forward" ? currentIndex + 1 : currentIndex - 1;
+
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= sortedLayers.length
+    ) {
+      return;
+    }
+
+    const currentLayer = sortedLayers[currentIndex];
+    const targetLayer = sortedLayers[targetIndex];
+    const currentNextZ = targetLayer.z;
+    const targetNextZ = currentLayer.z;
+
+    setCanvasLayers((currentLayers) =>
+      currentLayers.map((layer) => {
+        if (layer.id === currentLayer.id) {
+          return { ...layer, z: currentNextZ, z_index: currentNextZ };
+        }
+
+        if (layer.id === targetLayer.id) {
+          return { ...layer, z: targetNextZ, z_index: targetNextZ };
+        }
+
+        return layer;
+      })
+    );
+
+    const [currentResult, targetResult] = await Promise.all([
+      updateCanvasLayerZIndexRow(currentLayer.id, currentNextZ),
+      updateCanvasLayerZIndexRow(targetLayer.id, targetNextZ),
+    ]);
+
+    if (currentResult.error || targetResult.error) {
+      console.error(currentResult.error || targetResult.error);
+      setMessage("No se pudo cambiar la capa del elemento.");
+    }
+  }
+
   async function deleteCanvasLayer(id: string) {
     removeCanvasLayerFromState(id);
 
@@ -598,6 +650,7 @@ function App() {
           onMoveCanvasLayer={updateCanvasLayerPosition}
           onResizeCanvasLayer={updateCanvasLayerSize}
           onDeleteCanvasLayer={deleteCanvasLayer}
+          onMoveCanvasLayerInStack={moveCanvasLayerInStack}
           roomWindows={roomWindows}
           onWindowPositionChange={updateRoomWindowPosition}
           onWindowMinimizedChange={updateRoomWindowMinimized}
