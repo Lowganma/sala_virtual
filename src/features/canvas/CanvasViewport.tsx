@@ -17,6 +17,13 @@ const WORLD_HEIGHT = 4000;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3;
 
+export type CanvasViewportControls = {
+  zoom: number;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetView: () => void;
+};
+
 type CanvasViewportProps = {
   roomId: string;
   children?: ReactNode;
@@ -28,6 +35,7 @@ type CanvasViewportProps = {
     file?: File;
   }) => void;
   onCanvasMouseDown?: () => void;
+  onViewportControlsChange?: (controls: CanvasViewportControls | null) => void;
 };
 
 export function CanvasViewport({
@@ -35,6 +43,7 @@ export function CanvasViewport({
   children,
   onPasteImage,
   onCanvasMouseDown,
+  onViewportControlsChange,
 }: CanvasViewportProps) {
   const viewportRef = useRef<HTMLElement | null>(null);
   const panDragRef = useRef<{
@@ -72,6 +81,25 @@ export function CanvasViewport({
       void addStroke(settings, points);
     },
   });
+
+  useEffect(() => {
+    if (!onViewportControlsChange) {
+      return;
+    }
+
+    onViewportControlsChange({
+      zoom: view.zoom,
+      zoomIn,
+      zoomOut,
+      resetView,
+    });
+  }, [onViewportControlsChange, resetView, view.zoom, zoomIn, zoomOut]);
+
+  useEffect(() => {
+    return () => {
+      onViewportControlsChange?.(null);
+    };
+  }, [onViewportControlsChange]);
 
   useEffect(() => {
     if (!viewportRef.current) {
@@ -251,13 +279,6 @@ export function CanvasViewport({
         };
       }}
     >
-      <div className="viewport-tools">
-        <button onClick={zoomIn}>+</button>
-        <button onClick={zoomOut}>-</button>
-        <button onClick={resetView}>Reset</button>
-        <span>{Math.round(view.zoom * 100)}%</span>
-      </div>
-
       <DrawingToolbar
         settings={drawingSettings}
         isLoading={isLoadingStrokes}

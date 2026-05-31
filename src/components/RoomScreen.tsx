@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RefObject } from "react";
 import { CanvasArea } from "./CanvasArea";
+import type { CanvasViewportControls } from "../features/canvas/CanvasViewport";
 import { CanvasSidebar } from "./CanvasSidebar";
 import { RoomInfoPanel } from "./RoomInfoPanel";
 import { CanvasImageLayer } from "../features/canvas/CanvasImageLayer";
@@ -158,6 +159,15 @@ export function RoomScreen({
   );
   const [elementGroups, setElementGroups] = useState<ElementGroup[]>(
     () => loadElementPreferences(room.id).elementGroups
+  );
+  const [viewportControls, setViewportControls] =
+    useState<CanvasViewportControls | null>(null);
+
+  const handleViewportControlsChange = useCallback(
+    (nextViewportControls: CanvasViewportControls | null) => {
+      setViewportControls(nextViewportControls);
+    },
+    []
   );
 
   const sortedCanvasLayers = useMemo(
@@ -612,6 +622,7 @@ export function RoomScreen({
         roomId={room.id}
         onPasteImage={handlePasteImage}
         onCanvasMouseDown={clearElementSelection}
+        onViewportControlsChange={handleViewportControlsChange}
       >
         {sortedCanvasLayers.map((layer) => (
           <CanvasImageLayer
@@ -773,6 +784,7 @@ export function RoomScreen({
                 : "Sala",
           isMinimized: getWindowIsMinimized(windowConfig.window_key),
         }))}
+        viewportControls={viewportControls}
         onToggleItem={toggleWindow}
       />
     </main>
