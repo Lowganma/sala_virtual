@@ -129,41 +129,62 @@ export function useCanvasStrokes(roomId: string) {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "canvas_strokes",
-          filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          const nextStroke = normalizeStroke(payload.new as StrokeRow);
+          if (payload.eventType === "DELETE") {
+            const deletedStroke = payload.old as { id?: string };
 
-          setStrokes((currentStrokes) => {
-            if (currentStrokes.some((stroke) => stroke.id === nextStroke.id)) {
-              return currentStrokes;
+            if (!deletedStroke.id) {
+              return;
             }
 
-            return [...currentStrokes, nextStroke];
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "canvas_strokes",
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          const deletedStroke = payload.old as { id?: string };
-
-          if (!deletedStroke.id) {
+            setStrokes((currentStrokes) =>
+              currentStrokes.filter((stroke) => stroke.id !== deletedStroke.id)
+            );
             return;
           }
 
-          setStrokes((currentStrokes) =>
-            currentStrokes.filter((stroke) => stroke.id !== deletedStroke.id)
-          );
+          if (payload.eventType === "INSERT") {
+            const nextStroke = normalizeStroke(payload.new as StrokeRow);
+
+            if (nextStroke.room_id !== roomId) {
+              return;
+            }
+
+            setStrokes((currentStrokes) => {
+              if (currentStrokes.some((stroke) => stroke.id === nextStroke.id)) {
+                return currentStrokes;
+              }
+
+              return [...currentStrokes, nextStroke];
+            });
+            return;
+          }
+
+          if (payload.eventType === "UPDATE") {
+            const nextStroke = normalizeStroke(payload.new as StrokeRow);
+
+            setStrokes((currentStrokes) => {
+              if (nextStroke.room_id !== roomId) {
+                return currentStrokes.filter((stroke) => stroke.id !== nextStroke.id);
+              }
+
+              let strokeExists = false;
+              const nextStrokes = currentStrokes.map((stroke) => {
+                if (stroke.id !== nextStroke.id) {
+                  return stroke;
+                }
+
+                strokeExists = true;
+                return nextStroke;
+              });
+
+              return strokeExists ? nextStrokes : currentStrokes;
+            });
+          }
         }
       )
       .subscribe();
