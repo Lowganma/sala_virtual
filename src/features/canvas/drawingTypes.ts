@@ -5,6 +5,9 @@ export type DrawingLayerType = "background" | "overlay";
 export type StrokePoint = {
   x: number;
   y: number;
+  brushIntensity?: number;
+  brushSoftness?: number;
+  brushSmoothing?: number;
 };
 
 export type CanvasStroke = {

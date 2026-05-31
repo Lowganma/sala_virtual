@@ -34,24 +34,58 @@ function isStrokePoint(value: unknown): value is StrokePoint {
   return typeof point.x === "number" && typeof point.y === "number";
 }
 
-function numberOrDefault(value: number | string | null | undefined, fallback: number) {
+function numberOrDefault(
+  value: number | string | null | undefined,
+  fallback: number
+) {
   const numericValue = Number(value);
 
   return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
+function withBrushMetadata(
+  points: StrokePoint[],
+  settings: DrawingSettings
+): StrokePoint[] {
+  if (settings.tool !== "brush") {
+    return points;
+  }
+
+  const [firstPoint, ...restPoints] = points;
+
+  return [
+    {
+      ...firstPoint,
+      brushIntensity: settings.brushIntensity,
+      brushSoftness: settings.brushSoftness,
+      brushSmoothing: settings.brushSmoothing,
+    },
+    ...restPoints,
+  ];
 }
 
 function normalizeStroke(row: StrokeRow): CanvasStroke {
   const points = Array.isArray(row.points)
     ? row.points.filter(isStrokePoint)
     : [];
+  const firstPoint = points[0];
 
   return {
     ...row,
     size: numberOrDefault(row.size, 4),
     opacity: numberOrDefault(row.opacity, 1),
-    brush_intensity: numberOrDefault(row.brush_intensity, 1),
-    brush_softness: numberOrDefault(row.brush_softness, 0.25),
-    brush_smoothing: numberOrDefault(row.brush_smoothing, 0.35),
+    brush_intensity: numberOrDefault(
+      firstPoint?.brushIntensity ?? row.brush_intensity,
+      1
+    ),
+    brush_softness: numberOrDefault(
+      firstPoint?.brushSoftness ?? row.brush_softness,
+      0.25
+    ),
+    brush_smoothing: numberOrDefault(
+      firstPoint?.brushSmoothing ?? row.brush_smoothing,
+      0.35
+    ),
     points,
   };
 }
@@ -145,7 +179,6 @@ export function useCanvasStrokes(roomId: string) {
         return;
       }
 
-      const isBrush = settings.tool === "brush";
       const { data, error } = await supabase
         .from("canvas_strokes")
         .insert({
@@ -155,10 +188,7 @@ export function useCanvasStrokes(roomId: string) {
           color: settings.color,
           size: settings.size,
           opacity: settings.tool === "pencil" ? 1 : settings.opacity,
-          brush_intensity: isBrush ? settings.brushIntensity : 1,
-          brush_softness: isBrush ? settings.brushSoftness : 0,
-          brush_smoothing: isBrush ? settings.brushSmoothing : 0,
-          points,
+          points: withBrushMetadata(points, settings),
         })
         .select()
         .single();
