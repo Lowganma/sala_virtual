@@ -33,9 +33,9 @@ label {
 
 input {
   width: 100%;
-  border: 1px solid #475569;
+  border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 12px;
-  background: #0f172a;
+  background: rgba(15, 23, 42, 0.58);
   color: #f8fafc;
   padding: 12px 14px;
   font-size: 16px;
@@ -79,275 +79,29 @@ hr {
   margin-top: 16px;
 }
 
-.shared-box,
-.chat-messages {
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.24);
-}
-
-.preview-title {
-  font-weight: 800;
-  color: #e2e8f0 !important;
-  margin-bottom: 6px;
-}
-.youtube-frame {
-  width: 100%;
-  height: 100%;
-  min-height: 140px;
-  border: none;
-  border-radius: 0;
-  margin-top: 0;
-}
-.player-controls {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-.chat-panel {
-  margin-top: 22px;
-}
-
-.chat-panel h2 {
-  margin-top: 0;
-  font-size: 20px;
-}
-
-.chat-messages {
-  display: grid;
-  gap: 10px;
-  max-height: 260px;
-  overflow-y: auto;
-  background: #0f172a;
-  border: 1px solid #475569;
-  border-radius: 16px;
-  padding: 14px;
-}
-
-.empty-chat {
-  margin: 0;
-  color: #94a3b8 !important;
-}
-
-.chat-message {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 14px;
-  padding: 10px 12px;
-}
-
-.chat-message-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 4px;
-  color: #e2e8f0;
-}
-
-.chat-message-header span {
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.chat-message p {
-  margin: 0;
-  color: #f8fafc;
-}
-
-.chat-form {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
 .room-layout {
+  position: relative;
   width: 100%;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 200px;
+  overflow: hidden;
   background: #0f172a;
-  position: relative;
-  overflow: hidden;
-}
-
-.canvas-area {
-  min-height: 100vh;
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 20% 10%, rgba(56, 189, 248, 0.22), transparent 28%),
-    radial-gradient(circle at 70% 80%, rgba(168, 85, 247, 0.16), transparent 30%),
-    #0f172a;
-}
-
-.canvas-grid {
-  width: 100%;
-  height: 100%;
-  min-height: 100vh;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 32px 32px;
-  position: relative;
-}
-
-.canvas-empty-state {
-  position: absolute;
-  left: 32px;
-  top: 32px;
-  max-width: 420px;
-  padding: 20px;
-  border: 1px dashed rgba(148, 163, 184, 0.45);
-  border-radius: 20px;
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(10px);
-}
-
-.canvas-empty-state h2 {
-  margin-top: 0;
-  margin-bottom: 8px;
-}
-
-.canvas-empty-state p {
-  margin-bottom: 0;
-  color: #cbd5e1;
-}
-
-.room-sidebar {
-  height: 100vh;
-  overflow-y: auto;
-  border-left: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.92);
-  padding: 18px;
-}
-
-.room-sidebar .card {
-  width: 100%;
-  max-width: none;
-  box-shadow: none;
-}
-.room-layout {
-  position: relative;
-  width: 100%;
-  min-height: 100vh;
-  overflow: hidden;
-}
-
-.canvas-area {
-  width: 100%;
-  min-height: 100vh;
-}
-
-.floating-window {
-  position: absolute;
-  background: transparent;
-  border: none;
-  border-radius: 14px;
-  box-shadow: none;
-  overflow: visible;
-  backdrop-filter: none;
-  z-index: 10;
-}
-
-.floating-window-header {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 5px 10px;
-  background: rgba(15, 23, 42, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #f8fafc;
-  cursor: grab;
-  user-select: none;
-  backdrop-filter: blur(10px);
-}
-
-.floating-window-body {
-  padding: 8px 0 0;
-  max-height: none;
-  overflow: visible;
-  background: transparent;
-}
-
-.room-info-window {
-  width: 260px;
-}
-
-.music-window {
-  width: 280px;
-}
-
-.chat-window {
-  width: 300px;
-  height: 300px;
-}
-
-.chat-window .floating-window-body {
-  height: calc(100% - 42px);
-}
-
-.chat-window .chat-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-window .chat-messages {
-  flex: 1;
-}
-
-.is-dragging-window,
-.is-dragging-window * {
-  user-select: none;
-  cursor: grabbing !important;
-}
-
-.floating-window-header {
-  user-select: none;
 }
 
 .canvas-main {
   position: relative;
   width: 100%;
   height: 100vh;
-  overflow: hidden;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   background: #0b1020;
   cursor: default;
 }
 
 .canvas-main.is-panning {
   cursor: grabbing;
-}
-
-.viewport-tools {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 220;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid #334155;
-  border-radius: 14px;
-  padding: 8px;
-  backdrop-filter: blur(10px);
-}
-
-.viewport-tools button {
-  width: auto;
-  margin: 0;
-  padding: 8px 12px;
-}
-
-.viewport-tools span {
-  color: #f8fafc;
-  font-weight: 800;
-  min-width: 52px;
-  text-align: center;
 }
 
 .design-surface {
@@ -380,6 +134,44 @@ hr {
   border-radius: 20px;
   background: rgba(15, 23, 42, 0.72);
   backdrop-filter: blur(10px);
+}
+
+.canvas-empty-state h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.canvas-empty-state p {
+  margin-bottom: 0;
+  color: #cbd5e1;
+}
+
+.viewport-tools {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.viewport-tools button {
+  width: auto;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.viewport-tools span {
+  color: #f8fafc;
+  font-weight: 800;
+  min-width: 52px;
+  text-align: center;
 }
 
 .canvas-sidebar {
@@ -427,6 +219,295 @@ hr {
 .module-button.minimized {
   background: #22c55e;
   color: #052e16;
+}
+
+.floating-window {
+  position: absolute;
+  min-width: 180px;
+  min-height: 120px;
+  background: transparent;
+  border: none;
+  border-radius: 14px;
+  box-shadow: none;
+  overflow: visible;
+  backdrop-filter: none;
+  z-index: 10;
+}
+
+.floating-window.selected {
+  outline: 1px dashed rgba(56, 189, 248, 0.65);
+  outline-offset: 3px;
+}
+
+.floating-window-header {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #f8fafc;
+  cursor: grab;
+  user-select: none;
+  backdrop-filter: blur(10px);
+}
+
+.floating-window-body {
+  height: calc(100% - 36px);
+  padding: 8px 0 0;
+  overflow: auto;
+  background: transparent;
+}
+
+.room-info-window {
+  width: 260px;
+}
+
+.music-window {
+  width: 280px;
+}
+
+.chat-window {
+  width: 300px;
+  height: 300px;
+}
+
+.chat-window .floating-window-body {
+  height: calc(100% - 42px);
+}
+
+.window-resize-handle {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 5px;
+  background: #38bdf8;
+  border: 2px solid #0f172a;
+  cursor: nwse-resize;
+  z-index: 20;
+}
+
+.is-dragging-window,
+.is-dragging-window * {
+  user-select: none;
+  cursor: grabbing !important;
+}
+
+.room-info-panel {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(8px);
+}
+
+.room-info-panel h1 {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+.room-info-panel p {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.ghost-danger-button {
+  width: auto;
+  height: 30px;
+  min-width: 0;
+  padding: 0 12px;
+  margin-top: 10px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  font-size: 12px;
+}
+
+.music-panel {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.26);
+  backdrop-filter: blur(8px);
+}
+
+.music-url-row {
+  display: grid;
+  grid-template-columns: 1fr 38px;
+  gap: 6px;
+}
+
+.music-url-row input {
+  height: 34px;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.compact-button {
+  width: 38px;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.music-video-shell {
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.youtube-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 140px;
+  border: none;
+  border-radius: 0;
+  margin-top: 0;
+}
+
+.media-controls-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.media-button {
+  width: 42px;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.chat-panel {
+  margin-top: 22px;
+}
+
+.chat-window .chat-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-window .chat-messages {
+  flex: 1;
+}
+
+.chat-messages {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.empty-chat {
+  margin: 0;
+  color: #94a3b8 !important;
+}
+
+.chat-message {
+  background: rgba(30, 41, 59, 0.58);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.chat-message-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  color: #e2e8f0;
+}
+
+.chat-message-header span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.chat-message p {
+  margin: 0;
+  color: #f8fafc;
+}
+
+.chat-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.compact-chat-panel {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(8px);
+}
+
+.compact-chat-panel .chat-messages {
+  max-height: none;
+  min-height: 160px;
+  background: rgba(15, 23, 42, 0.22);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 8px;
+}
+
+.compact-chat-panel .chat-message {
+  background: rgba(15, 23, 42, 0.38);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  padding: 8px;
+}
+
+.compact-chat-form {
+  display: grid;
+  grid-template-columns: 1fr 70px;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.compact-chat-form input {
+  height: 34px;
+  font-size: 12px;
+  border-radius: 10px;
+}
+
+.compact-chat-form button {
+  height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+  margin: 0;
+  border-radius: 10px;
+  font-size: 12px;
 }
 
 .canvas-layer {
@@ -480,189 +561,7 @@ hr {
   cursor: nwse-resize;
   z-index: 5;
 }
-.shared-box,
-.chat-messages {
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.24);
-}
 
-.chat-message {
-  background: rgba(30, 41, 59, 0.58);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-input {
-  background: rgba(15, 23, 42, 0.58);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-}
-
-.room-info-panel {
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.32);
-  backdrop-filter: blur(8px);
-}
-
-.room-info-panel h1 {
-  font-size: 20px;
-  margin: 0 0 8px;
-}
-
-.room-info-panel p {
-  margin: 4px 0;
-  font-size: 12px;
-  color: #e2e8f0;
-}
-
-.music-panel {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.26);
-  backdrop-filter: blur(8px);
-}
-
-.music-url-row {
-  display: grid;
-  grid-template-columns: 1fr 38px;
-  gap: 6px;
-}
-
-.music-url-row input {
-  height: 34px;
-  font-size: 11px;
-  padding: 8px 10px;
-  border-radius: 10px;
-}
-
-.compact-button {
-  width: 38px;
-  height: 34px;
-  min-width: 0;
-  padding: 0;
-  margin: 0;
-  border-radius: 10px;
-  font-size: 14px;
-}
-
-.music-video-shell {
-  min-height: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.media-controls-row {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.media-button {
-  width: 42px;
-  height: 34px;
-  min-width: 0;
-  padding: 0;
-  margin: 0;
-  border-radius: 10px;
-  font-size: 15px;
-  line-height: 1;
-}
-
-.compact-chat-panel {
-  height: 100%;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.24);
-  backdrop-filter: blur(8px);
-}
-
-.compact-chat-panel .chat-messages {
-  max-height: none;
-  min-height: 160px;
-  background: rgba(15, 23, 42, 0.22);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  padding: 8px;
-}
-
-.compact-chat-panel .chat-message {
-  background: rgba(15, 23, 42, 0.38);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  padding: 8px;
-}
-
-.compact-chat-form {
-  display: grid;
-  grid-template-columns: 1fr 70px;
-  gap: 6px;
-  margin-top: 0;
-}
-
-.compact-chat-form input {
-  height: 34px;
-  font-size: 12px;
-  border-radius: 10px;
-}
-
-.compact-chat-form button {
-  height: 34px;
-  min-width: 0;
-  padding: 0 10px;
-  margin: 0;
-  border-radius: 10px;
-  font-size: 12px;
-}
-
-.ghost-danger-button {
-  width: auto;
-  height: 30px;
-  min-width: 0;
-  padding: 0 12px;
-  margin-top: 10px;
-  border-radius: 10px;
-  background: rgba(239, 68, 68, 0.18);
-  color: #fecaca;
-  border: 1px solid rgba(248, 113, 113, 0.25);
-  font-size: 12px;
-}
-.floating-window.selected {
-  outline: 1px dashed rgba(56, 189, 248, 0.65);
-  outline-offset: 3px;
-}
-
-.window-resize-handle {
-  position: absolute;
-  right: -8px;
-  bottom: -8px;
-  width: 16px;
-  height: 16px;
-  min-width: 0;
-  padding: 0;
-  margin: 0;
-  border-radius: 5px;
-  background: #38bdf8;
-  border: 2px solid #0f172a;
-  cursor: nwse-resize;
-  z-index: 20;
-}
-.floating-window {
-  min-width: 180px;
-  min-height: 120px;
-}
-
-.floating-window-body {
-  height: calc(100% - 36px);
-  overflow: auto;
-}
 .canvas-layer-error {
   width: 100%;
   height: 100%;

@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
-import { YouTubePlayer } from "./YouTubePlayer";
-import type { YouTubePlayerHandle } from "./YouTubePlayer";
+import { YouTubePlayer } from "./YoutubePlayer";
+import type { YouTubePlayerHandle } from "./YoutubePlayer";
 
 type MusicPanelProps = {
   youtubePlayerRef: RefObject<YouTubePlayerHandle | null>;
