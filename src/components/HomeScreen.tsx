@@ -24,7 +24,7 @@ return (
         <h1>Sala Virtual   </h1>
 
         <p>
-            Crea una sala o entra con un codigo para compartir una pantalla en tiempo real.
+            Elige un nombre o código de sala, por ejemplo "prueba", para crearla o entrar con otras personas.
             
         </p>
 
@@ -34,18 +34,18 @@ return (
             onChange={(e) => onUsernameChange(e.target.value)}
             placeholder="Ej: Williams"
         />
-         <button onClick={onCreateRoom} disabled={loading}>
+      <label>Nombre o código de sala</label>
+      <input
+        value={roomCode}
+        onChange={(event) => onRoomCodeChange(event.target.value)}
+        placeholder="Ej: prueba"
+      />
+
+      <button onClick={onCreateRoom} disabled={loading}>
         {loading ? "Creando..." : "Crear sala"}
       </button>
 
       <hr />
-
-      <label>Código de sala</label>
-      <input
-        value={roomCode}
-        onChange={(event) => onRoomCodeChange(event.target.value)}
-        placeholder="Ej: ABC123"
-      />
 
       <button onClick={onJoinRoom} disabled={loading}>
         {loading ? "Buscando..." : "Unirse a sala"}

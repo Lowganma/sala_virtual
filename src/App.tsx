@@ -4,7 +4,6 @@ import "./App.css";
 import { HomeScreen } from "./components/HomeScreen";
 import { RoomScreen } from "./components/RoomScreen";
 import type { CanvasImageLayer } from "./features/canvas/canvasTypes";
-import { generateRoomCode } from "./features/rooms/roomCode";
 import { useRoomRealtime } from "./features/rooms/useRoomRealtime";
 import type { WindowPosition, WindowSize } from "./features/windows/windowTypes";
 import type { YouTubePlayerHandle } from "./features/music/YoutubePlayer";
@@ -191,12 +190,43 @@ function App() {
     setCanvasLayers(data);
   }
 
+  function getManualRoomCode() {
+    return roomCode.trim().toLowerCase();
+  }
+
+  async function enterRoom(roomData: Room, loadExistingMessages = true) {
+    setCurrentRoom(roomData);
+    await loadRoomState(roomData.id);
+
+    if (loadExistingMessages) {
+      await loadRoomMessages(roomData.id);
+    } else {
+      setChatMessages([]);
+    }
+
+    await loadOrCreateRoomWindows(roomData.id);
+    await loadCanvasLayers(roomData.id);
+  }
+
   async function createRoom() {
     setLoading(true);
     setMessage("");
 
     try {
-      const code = generateRoomCode();
+      const code = getManualRoomCode();
+
+      if (!code) {
+        setMessage("Escribe el nombre o código de la sala que quieres crear.");
+        return;
+      }
+
+      const { data: existingRoom } = await findRoomByCode(code);
+
+      if (existingRoom) {
+        await enterRoom(existingRoom);
+        return;
+      }
+
       const { data: roomData, error: roomError } = await insertRoom(code);
 
       if (roomError || !roomData) {
@@ -232,10 +262,10 @@ function App() {
     setMessage("");
 
     try {
-      const cleanCode = roomCode.trim().toUpperCase();
+      const cleanCode = getManualRoomCode();
 
       if (!cleanCode) {
-        setMessage("Escribe un código de sala.");
+        setMessage("Escribe el nombre o código de la sala.");
         return;
       }
 
@@ -245,15 +275,11 @@ function App() {
 
       if (roomError || !roomData) {
         console.error(roomError);
-        setMessage("No encontramos una sala con ese código.");
+        setMessage("No encontramos una sala con ese nombre o código.");
         return;
       }
 
-      setCurrentRoom(roomData);
-      await loadRoomState(roomData.id);
-      await loadRoomMessages(roomData.id);
-      await loadOrCreateRoomWindows(roomData.id);
-      await loadCanvasLayers(roomData.id);
+      await enterRoom(roomData);
     } catch (error) {
       console.error(error);
       setMessage("Ocurrió un error al intentar entrar a la sala.");
