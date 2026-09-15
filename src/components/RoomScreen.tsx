@@ -561,21 +561,23 @@ export function RoomScreen({
         return;
       }
 
-      const selectedCanvasIds = selectedKeys
-        .filter((key) => key.startsWith("canvas:") && !lockedElementKeys.has(key))
-        .map((key) => key.replace("canvas:", ""));
-
-      if (selectedCanvasIds.length === 0) {
+      if (selectedKeys.length === 0) {
         return;
       }
 
       event.preventDefault();
 
+      const selectedCanvasIds = selectedKeys
+        .filter((key) => key.startsWith("canvas:") && !lockedElementKeys.has(key))
+        .map((key) => key.replace("canvas:", ""));
+
       for (const id of selectedCanvasIds) {
         void onDeleteCanvasLayer(id);
       }
 
-      clearElementSelection();
+      if (selectedCanvasIds.length > 0) {
+        clearElementSelection();
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown);
