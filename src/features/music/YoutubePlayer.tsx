@@ -104,7 +104,7 @@ export const YouTubePlayer = forwardRef<
   const lastAppliedSyncRef = useRef<string>("");
 
   const videoId = getYoutubeVideoId(youtubeUrl);
-  const syncCompensationSeconds = 0; // Compensación para la latencia de red y procesamiento
+  const syncCompensationSeconds = 0;
 
   useImperativeHandle(ref, () => ({
     getCurrentTime() {
@@ -119,11 +119,28 @@ export const YouTubePlayer = forwardRef<
   }));
 
   useEffect(() => {
-    if (!videoId || !containerRef.current) {
+    const container = containerRef.current;
+
+    if (!container) {
       return;
     }
 
     let cancelled = false;
+
+    if (!videoId) {
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch (error) {
+          console.error("No se pudo destruir el reproductor de YouTube:", error);
+        }
+
+        playerRef.current = null;
+      }
+
+      container.replaceChildren();
+      return;
+    }
 
     async function setupPlayer() {
       await loadYouTubeApi();
@@ -135,11 +152,22 @@ export const YouTubePlayer = forwardRef<
       }
 
       if (playerRef.current) {
-        playerRef.current.destroy();
+        try {
+          playerRef.current.destroy();
+        } catch (error) {
+          console.error("No se pudo reiniciar el reproductor de YouTube:", error);
+        }
+
         playerRef.current = null;
       }
 
-      playerRef.current = new Player(containerRef.current, {
+      const activeContainer = containerRef.current;
+      activeContainer.replaceChildren();
+
+      const playerMount = document.createElement("div");
+      activeContainer.appendChild(playerMount);
+
+      playerRef.current = new Player(playerMount, {
         videoId,
         playerVars: {
           playsinline: 1,
@@ -153,12 +181,26 @@ export const YouTubePlayer = forwardRef<
       });
     }
 
-    setupPlayer();
+    void setupPlayer();
 
     return () => {
       cancelled = true;
     };
   }, [videoId, onReady]);
+
+  useEffect(() => {
+    return () => {
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch (error) {
+          console.error("No se pudo cerrar el reproductor de YouTube:", error);
+        }
+
+        playerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const player = playerRef.current;
@@ -194,10 +236,6 @@ export const YouTubePlayer = forwardRef<
       console.error("No se pudo sincronizar el reproductor:", error);
     }
   }, [videoId, isPlaying, playbackSeconds, playbackUpdatedAt]);
-
-  if (!videoId) {
-    return <p>Todavía no hay video válido.</p>;
-  }
 
   return <div className="youtube-frame" ref={containerRef} />;
 });
