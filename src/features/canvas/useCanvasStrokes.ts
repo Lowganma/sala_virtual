@@ -24,6 +24,11 @@ type StrokeRow = Omit<
   points: unknown;
 };
 
+type ClearedLayerBackup = {
+  layerType: DrawingLayerType;
+  strokes: CanvasStroke[];
+};
+
 function isStrokePoint(value: unknown): value is StrokePoint {
   if (!value || typeof value !== "object") {
     return false;
@@ -93,6 +98,8 @@ function normalizeStroke(row: StrokeRow): CanvasStroke {
 export function useCanvasStrokes(roomId: string) {
   const [strokes, setStrokes] = useState<CanvasStroke[]>([]);
   const [isLoadingStrokes, setIsLoadingStrokes] = useState(false);
+  const [lastClearedLayer, setLastClearedLayer] =
+    useState<ClearedLayerBackup | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -121,6 +128,10 @@ export function useCanvasStrokes(roomId: string) {
     return () => {
       isMounted = false;
     };
+  }, [roomId]);
+
+  useEffect(() => {
+    setLastClearedLayer(null);
   }, [roomId]);
 
   useEffect(() => {
@@ -270,9 +281,13 @@ export function useCanvasStrokes(roomId: string) {
 
   const clearLayer = useCallback(
     async (layerType: DrawingLayerType) => {
-      setStrokes((currentStrokes) =>
-        currentStrokes.filter((stroke) => stroke.layer_type !== layerType)
+      const strokesToClear = strokes.filter(
+        (stroke) => stroke.layer_type === layerType
       );
+
+      if (strokesToClear.length === 0) {
+        return false;
+      }
 
       const { error } = await supabase
         .from("canvas_strokes")
@@ -282,10 +297,66 @@ export function useCanvasStrokes(roomId: string) {
 
       if (error) {
         console.error(error);
+        return false;
       }
+
+      setLastClearedLayer({
+        layerType,
+        strokes: strokesToClear,
+      });
+
+      setStrokes((currentStrokes) =>
+        currentStrokes.filter((stroke) => stroke.layer_type !== layerType)
+      );
+
+      return true;
     },
-    [roomId]
+    [roomId, strokes]
   );
+
+  const restoreLastClearedLayer = useCallback(async () => {
+    if (!lastClearedLayer || lastClearedLayer.strokes.length === 0) {
+      return false;
+    }
+
+    const rowsToRestore = lastClearedLayer.strokes.map((stroke) => ({
+      room_id: roomId,
+      layer_type: stroke.layer_type,
+      tool: stroke.tool,
+      color: stroke.color,
+      size: stroke.size,
+      opacity: stroke.opacity,
+      brush_intensity: stroke.brush_intensity,
+      brush_softness: stroke.brush_softness,
+      brush_smoothing: stroke.brush_smoothing,
+      points: stroke.points,
+    }));
+
+    const { data, error } = await supabase
+      .from("canvas_strokes")
+      .insert(rowsToRestore)
+      .select();
+
+    if (error) {
+      console.error(error);
+      return false;
+    }
+
+    if (data) {
+      const restoredStrokes = data.map((row) => normalizeStroke(row as StrokeRow));
+
+      setStrokes((currentStrokes) => {
+        const currentIds = new Set(currentStrokes.map((stroke) => stroke.id));
+        return [
+          ...currentStrokes,
+          ...restoredStrokes.filter((stroke) => !currentIds.has(stroke.id)),
+        ];
+      });
+    }
+
+    setLastClearedLayer(null);
+    return true;
+  }, [lastClearedLayer, roomId]);
 
   return {
     strokes,
@@ -293,5 +364,8 @@ export function useCanvasStrokes(roomId: string) {
     addStroke,
     undoLastStroke,
     clearLayer,
+    restoreLastClearedLayer,
+    canRestoreLastClearedLayer: Boolean(lastClearedLayer?.strokes.length),
+    lastClearedLayerType: lastClearedLayer?.layerType ?? null,
   };
 }
