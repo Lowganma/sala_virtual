@@ -110,18 +110,38 @@ export function useRoomRealtime({
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "canvas_layers",
           filter: `room_id=eq.${room.id}`,
         },
+        (payload) =>
+          onCanvasLayerChange(normalizeCanvasLayer(payload.new as never))
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "canvas_layers",
+          filter: `room_id=eq.${room.id}`,
+        },
+        (payload) =>
+          onCanvasLayerChange(normalizeCanvasLayer(payload.new as never))
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "canvas_layers",
+        },
         (payload) => {
-          if (payload.eventType === "DELETE") {
-            onCanvasLayerDelete((payload.old as { id: string }).id);
-            return;
-          }
+          const deletedId = (payload.old as { id?: string }).id;
 
-          onCanvasLayerChange(normalizeCanvasLayer(payload.new as never));
+          if (deletedId) {
+            onCanvasLayerDelete(deletedId);
+          }
         }
       )
       .subscribe();
