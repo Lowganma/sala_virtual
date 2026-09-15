@@ -62,8 +62,16 @@ export function CanvasViewport({
     DEFAULT_DRAWING_SETTINGS
   );
 
-  const { strokes, isLoadingStrokes, addStroke, undoLastStroke, clearLayer } =
-    useCanvasStrokes(roomId);
+  const {
+    strokes,
+    isLoadingStrokes,
+    addStroke,
+    undoLastStroke,
+    clearLayer,
+    restoreLastClearedLayer,
+    canRestoreLastClearedLayer,
+    lastClearedLayerType,
+  } = useCanvasStrokes(roomId);
 
   const { view, zoomAtPoint, panByPointerDrag, zoomIn, zoomOut, resetView } =
     useCanvasViewport({
@@ -289,6 +297,11 @@ export function CanvasViewport({
         onClearLayer={(layerType) => {
           void clearLayer(layerType);
         }}
+        onRestoreLastClear={() => {
+          void restoreLastClearedLayer();
+        }}
+        canRestoreLastClear={canRestoreLastClearedLayer}
+        lastClearedLayerType={lastClearedLayerType}
       />
 
       <div
