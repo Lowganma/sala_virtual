@@ -886,3 +886,65 @@ hr {
 .floating-window-header .lock-badge {
   margin-left: 8px;
 }
+
+.drawing-clear-warning,
+.drawing-clear-recovery {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 260;
+  width: 280px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.98);
+  color: #f8fafc;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+}
+
+.drawing-clear-warning {
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.drawing-clear-recovery {
+  border: 1px solid rgba(56, 189, 248, 0.38);
+}
+
+.drawing-clear-warning strong {
+  color: #fecaca;
+  font-size: 13px;
+}
+
+.drawing-clear-warning span,
+.drawing-clear-recovery span {
+  color: #cbd5e1;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.drawing-clear-warning-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.drawing-toolbar .drawing-clear-cancel-button {
+  background: rgba(71, 85, 105, 0.85);
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+.drawing-toolbar .drawing-clear-confirm-button {
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  font-size: 12px;
+}
+
+.drawing-toolbar .drawing-restore-button {
+  justify-self: start;
+  background: rgba(56, 189, 248, 0.9);
+  color: #082f49;
+  font-size: 12px;
+}
