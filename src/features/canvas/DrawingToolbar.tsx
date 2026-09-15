@@ -11,6 +11,9 @@ type DrawingToolbarProps = {
   onSettingsChange: (settings: DrawingSettings) => void;
   onUndoStroke?: () => void;
   onClearLayer?: (layerType: DrawingLayerType) => void;
+  onRestoreLastClear?: () => void;
+  canRestoreLastClear?: boolean;
+  lastClearedLayerType?: DrawingLayerType | null;
 };
 
 const TOOL_LABELS: Array<{ tool: DrawingTool; label: string; title: string }> = [
@@ -26,8 +29,12 @@ export function DrawingToolbar({
   onSettingsChange,
   onUndoStroke,
   onClearLayer,
+  onRestoreLastClear,
+  canRestoreLastClear = false,
+  lastClearedLayerType = null,
 }: DrawingToolbarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showClearWarning, setShowClearWarning] = useState(false);
   const isBrush = settings.tool === "brush";
 
   function updateSettings(partialSettings: Partial<DrawingSettings>) {
@@ -194,10 +201,55 @@ export function DrawingToolbar({
           type="button"
           className="drawing-clear-button"
           disabled={isLoading}
-          onClick={() => onClearLayer(settings.layerType)}
+          onClick={() => setShowClearWarning(true)}
         >
           Limpiar capa
         </button>
+      )}
+
+      {showClearWarning && (
+        <div className="drawing-clear-warning" role="alertdialog" aria-modal="true">
+          <strong>¿Limpiar todos los trazos?</strong>
+          <span>
+            Se borrarán todos los trazos de la capa
+            {settings.layerType === "background" ? " Fondo" : " Encima"}.
+          </span>
+          <span>Podrás recuperarlos inmediatamente después.</span>
+          <div className="drawing-clear-warning-actions">
+            <button
+              type="button"
+              className="drawing-clear-cancel-button"
+              onClick={() => setShowClearWarning(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="drawing-clear-confirm-button"
+              onClick={() => {
+                onClearLayer(settings.layerType);
+                setShowClearWarning(false);
+              }}
+            >
+              Sí, limpiar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {canRestoreLastClear && onRestoreLastClear && (
+        <div className="drawing-clear-recovery" role="status">
+          <span>
+            Capa {lastClearedLayerType === "overlay" ? "Encima" : "Fondo"} limpiada.
+          </span>
+          <button
+            type="button"
+            className="drawing-restore-button"
+            onClick={onRestoreLastClear}
+          >
+            Recuperar trazos
+          </button>
+        </div>
       )}
     </div>
   );
