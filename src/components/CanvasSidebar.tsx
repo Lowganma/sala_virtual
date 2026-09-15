@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CanvasViewportControls } from "../features/canvas/CanvasViewport";
 
 type CanvasSidebarItem = {
@@ -19,6 +19,20 @@ export function CanvasSidebar({
   onToggleItem,
 }: CanvasSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    const roomLayout = document.querySelector<HTMLElement>(".room-layout");
+
+    if (!roomLayout) {
+      return;
+    }
+
+    roomLayout.style.gridTemplateColumns = isCollapsed ? "1fr" : "1fr 200px";
+
+    return () => {
+      roomLayout.style.removeProperty("grid-template-columns");
+    };
+  }, [isCollapsed]);
 
   return (
     <aside
